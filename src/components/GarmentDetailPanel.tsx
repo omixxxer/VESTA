@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Garment } from '../types/domain'
-import { useObjectUrl } from './useObjectUrl'
+import GarmentPhoto from './GarmentPhoto'
 import GarmentForm from './GarmentForm'
 
 interface GarmentDetailPanelProps {
@@ -18,7 +18,13 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
   const panelRef = useRef<HTMLElement>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-  const imageUrl = useObjectUrl(garment.image)
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
+  const photos = [garment.image, ...(garment.additionalImages ?? [])]
+  const selectedPhoto = photos[selectedPhotoIndex] ?? photos[0]
+
+  useEffect(() => {
+    setSelectedPhotoIndex(0)
+  }, [garment.id])
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -91,10 +97,31 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
         ) : (
           <>
             <h2 className="detail-heading" id="detail-title">{garment.name.trim() || garment.subcategory || garment.category}</h2>
-            {imageUrl && <img className="detail-photo" src={imageUrl} alt={garment.name || garment.category} />}
+            {selectedPhoto && (
+              <>
+                <GarmentPhoto image={selectedPhoto} className="detail-photo" alt={garment.name || garment.category} />
+                {photos.length > 1 && (
+                  <div className="detail-photo-list" aria-label="Fotos de la prenda">
+                    {photos.map((photo, index) => (
+                      <button
+                        className={index === selectedPhotoIndex ? 'selected' : ''}
+                        type="button"
+                        key={index}
+                        onClick={() => setSelectedPhotoIndex(index)}
+                        aria-label={`Ver foto ${index + 1}`}
+                        aria-pressed={index === selectedPhotoIndex}
+                      >
+                        <GarmentPhoto image={photo} alt="" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
             <dl className="property-list">
               <div><dt>Categoría</dt><dd>{garment.category}{garment.subcategory && ` · ${garment.subcategory}`}</dd></div>
               <div><dt>Colores</dt><dd>{garment.colors.join(', ') || 'Sin especificar'}</dd></div>
+              <div><dt>Estampado</dt><dd>{garment.pattern || 'Sin especificar'}</dd></div>
               <div><dt>Marca</dt><dd>{garment.brand || 'Sin especificar'}</dd></div>
               <div><dt>Talla</dt><dd>{garment.size || 'Sin especificar'}</dd></div>
               <div><dt>Temporadas</dt><dd>{garment.seasons.join(', ') || 'Sin especificar'}</dd></div>
@@ -105,7 +132,11 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
                   <dt>Procedencia del análisis</dt>
                   <dd>
                     Sugerencias locales de {garment.analysis.modelId} ({garment.analysis.modelVersion.slice(0, 8)}).
-                    {' '}Categoría: CLIP zero-shot; color: muestreo de píxeles.
+                    {' '}Categoría: {garment.analysis.sourcesByAttribute.category === 'clip-zero-shot'
+                      ? 'CLIP zero-shot'
+                      : garment.analysis.sourcesByAttribute.category === 'wargon-vit'
+                        ? 'clasificación ViT de 27 clases'
+                        : 'clasificador de imágenes'}; color: muestreo de píxeles.
                     {' '}Puntuación no calibrada de categoría: {((garment.analysis.confidenceByAttribute.category ?? 0) * 100).toFixed(1)}%;
                     {' '}predominio heurístico del color: {((garment.analysis.confidenceByAttribute.colors ?? 0) * 100).toFixed(1)}%.
                     {' '}Atributos corregidos: {garment.analysis.correctedAttributes.join(', ') || 'ninguno registrado'}.

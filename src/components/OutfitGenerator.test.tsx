@@ -1,0 +1,81 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { database } from '../db/database'
+import type { Garment } from '../types/domain'
+import OutfitGenerator from './OutfitGenerator'
+
+function makeGarment(id: string, role: Garment['role']): Garment {
+  return {
+    id,
+    name: id,
+    category: role === 'Top' ? 'Parte superior' : 'Parte inferior',
+    subcategory: '',
+    colors: ['Azul'],
+    seasons: [],
+    styles: [],
+    formality: 'Casual',
+    role,
+    image: new Blob(['photo'], { type: 'image/png' }),
+    thumbnail: new Blob(['thumbnail'], { type: 'image/png' }),
+    width: 100,
+    height: 100,
+    confirmedAttributes: [],
+    suggestedAttributes: [],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z'
+  }
+}
+
+afterEach(async () => {
+  await database.open()
+  await Promise.all([
+    database.garments.clear(),
+    database.outfits.clear(),
+    database.preferences.clear(),
+    database.outfitFeedback.clear()
+  ])
+})
+
+describe('OutfitGenerator', () => {
+  it('generates only wardrobe photos and persists saved outfits and feedback locally', async () => {
+    await database.open()
+    const garments = [makeGarment('shirt', 'Top'), makeGarment('trousers', 'Bottom')]
+    await database.garments.bulkAdd(garments)
+    const user = userEvent.setup()
+    const props = { garments, onAvailabilityChange: vi.fn().mockResolvedValue(undefined) }
+    const rendered = render(<OutfitGenerator {...props} />)
+
+    await user.click(screen.getByRole('button', { name: 'Generar outfits' }))
+    expect(await screen.findByRole('heading', { name: /Casual · \d+(?:\.\d+)?\/100/ })).toBeInTheDocument()
+    expect((await screen.findAllByRole('img')).map((image) => image.getAttribute('alt'))).toEqual(['shirt', 'trousers'])
+
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    await waitFor(async () => {
+      expect(await database.outfits.toArray()).toEqual([
+        expect.objectContaining({ garmentIds: ['shirt', 'trousers'], favorite: true })
+      ])
+      expect(await database.outfitFeedback.toArray()).toEqual([
+        expect.objectContaining({ type: 'saved', garmentIds: ['shirt', 'trousers'] })
+      ])
+    })
+    expect((await database.outfits.toArray()).filter((outfit) => outfit.favorite)).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: 'Favoritos e historial local' })).toBeInTheDocument()
+    rendered.unmount()
+    render(<OutfitGenerator {...props} />)
+    expect(await screen.findByRole('heading', { name: 'Favoritos e historial local' })).toBeInTheDocument()
+  })
+
+  it('persists and resets personal preference settings', async () => {
+    await database.open()
+    const user = userEvent.setup()
+    render(<OutfitGenerator garments={[]} onAvailabilityChange={vi.fn().mockResolvedValue(undefined)} />)
+    await user.click(screen.getByText('Preferencias personales'))
+    await user.type(screen.getByLabelText('Colores preferidos (separados por coma)'), 'Verde')
+    await user.click(screen.getByRole('button', { name: 'Guardar preferencias' }))
+    await waitFor(async () => expect(await database.preferences.get('current')).toMatchObject({ preferredColors: ['Verde'] }))
+
+    await user.click(screen.getByRole('button', { name: 'Restablecer' }))
+    await waitFor(async () => expect(await database.preferences.get('current')).toMatchObject({ preferredColors: [], preferredStyles: [] }))
+  })
+})

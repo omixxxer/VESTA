@@ -3,9 +3,9 @@ import wasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url'
 import wasmModuleUrl from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url'
 import type { GarmentCategory } from '../types/domain'
 
-export const CLOTHING_MODEL_ID = 'Xenova/clip-vit-base-patch32'
-export const CLOTHING_MODEL_VERSION = 'd15189d7028b43f1d3e65039190477f6af591c2a'
-export const MODEL_DOWNLOAD_SIZE = 'aprox. 153,7 MB (ONNX q8)'
+export const CLOTHING_MODEL_ID = 'wargoninnovation/wargon-clothing-classifier'
+export const CLOTHING_MODEL_VERSION = '972befbd9a82cda03352239d813ff4959d2ccb4d'
+export const MODEL_DOWNLOAD_SIZE = 'aprox. 89,2 MB (ONNX q8)'
 
 export interface ClothingPrediction {
   label: string
@@ -16,6 +16,11 @@ export interface ClothingAnalysisSuggestion {
   category: GarmentCategory
   subcategory: string
   colors: string[]
+  alternatives: Array<{
+    category: GarmentCategory
+    subcategory: string
+    score: number
+  }>
   confidenceByAttribute: Partial<Record<'category' | 'subcategory' | 'colors', number>>
   unknownAttributes: string[]
   modelId: string
@@ -36,49 +41,44 @@ interface NormalizedImage {
 
 type Classifier = (image: Blob) => Promise<ClothingPrediction[]>
 type ImageNormalizer = (image: Blob) => Promise<NormalizedImage>
-type ZeroShotClassifier = (image: RawImageType, candidateLabels: string[]) => Promise<ClothingPrediction[]>
+type ImageClassifier = (image: RawImageType) => Promise<ClothingPrediction[]>
 
-const candidates: Candidate[] = [
-  { label: 'a blazer', category: 'Abrigo', subcategory: 'Blazer' },
-  { label: 'a blouse', category: 'Parte superior', subcategory: 'Blusa' },
-  { label: 'a cardigan', category: 'Abrigo', subcategory: 'Cárdigan' },
-  { label: 'a dress', category: 'Vestido / mono', subcategory: 'Vestido' },
-  { label: 'a hoodie', category: 'Abrigo', subcategory: 'Sudadera con capucha' },
-  { label: 'a jacket', category: 'Abrigo', subcategory: 'Chaqueta' },
-  { label: 'jeans', category: 'Parte inferior', subcategory: 'Vaqueros' },
-  { label: 'a nightgown', category: 'Vestido / mono', subcategory: 'Camisón' },
-  { label: 'outerwear', category: 'Abrigo', subcategory: 'Prenda de abrigo' },
-  { label: 'pajamas', category: 'Vestido / mono', subcategory: 'Pijama' },
-  { label: 'a rain jacket', category: 'Abrigo', subcategory: 'Chubasquero' },
-  { label: 'rain trousers', category: 'Parte inferior', subcategory: 'Pantalón impermeable' },
-  { label: 'a robe', category: 'Vestido / mono', subcategory: 'Bata' },
-  { label: 'a shirt', category: 'Parte superior', subcategory: 'Camisa' },
-  { label: 'shorts', category: 'Parte inferior', subcategory: 'Pantalón corto' },
-  { label: 'a skirt', category: 'Parte inferior', subcategory: 'Falda' },
-  { label: 'a sweater', category: 'Abrigo', subcategory: 'Jersey' },
-  { label: 'a T-shirt', category: 'Parte superior', subcategory: 'Camiseta' },
-  { label: 'a tank top', category: 'Parte superior', subcategory: 'Camiseta de tirantes' },
-  { label: 'tights', category: 'Parte inferior', subcategory: 'Medias' },
-  { label: 'a top', category: 'Parte superior', subcategory: 'Top' },
-  { label: 'a training top', category: 'Parte superior', subcategory: 'Prenda deportiva' },
-  { label: 'trousers', category: 'Parte inferior', subcategory: 'Pantalón' },
-  { label: 'a tunic', category: 'Parte superior', subcategory: 'Túnica' },
-  { label: 'a vest', category: 'Abrigo', subcategory: 'Chaleco' },
-  { label: 'a winter jacket', category: 'Abrigo', subcategory: 'Chaqueta de invierno' },
-  { label: 'winter trousers', category: 'Parte inferior', subcategory: 'Pantalón de invierno' },
-  { label: 'shoes', category: 'Calzado', subcategory: 'Zapatos' },
-  { label: 'sneakers', category: 'Calzado', subcategory: 'Zapatillas' },
-  { label: 'boots', category: 'Calzado', subcategory: 'Botas' },
-  { label: 'sandals', category: 'Calzado', subcategory: 'Sandalias' },
-  { label: 'a handbag', category: 'Accesorio', subcategory: 'Bolso' },
-  { label: 'a hat', category: 'Accesorio', subcategory: 'Sombrero' },
-  { label: 'a belt', category: 'Accesorio', subcategory: 'Cinturón' }
+const modelClasses: Candidate[] = [
+  { label: 'Blazer', category: 'Abrigo', subcategory: 'Blazer' },
+  { label: 'Blouse', category: 'Parte superior', subcategory: 'Blusa' },
+  { label: 'Cardigan', category: 'Abrigo', subcategory: 'Cárdigan' },
+  { label: 'Dress', category: 'Vestido / mono', subcategory: 'Vestido' },
+  { label: 'Hoodie', category: 'Abrigo', subcategory: 'Sudadera con capucha' },
+  { label: 'Jacket', category: 'Abrigo', subcategory: 'Chaqueta' },
+  { label: 'Jeans', category: 'Parte inferior', subcategory: 'Vaqueros' },
+  { label: 'Nightgown', category: 'Vestido / mono', subcategory: 'Camisón' },
+  { label: 'Outerwear', category: 'Abrigo', subcategory: 'Prenda de abrigo' },
+  { label: 'Pajamas', category: 'Vestido / mono', subcategory: 'Pijama' },
+  { label: 'Rain jacket', category: 'Abrigo', subcategory: 'Chubasquero' },
+  { label: 'Rain trousers', category: 'Parte inferior', subcategory: 'Pantalón impermeable' },
+  { label: 'Robe', category: 'Vestido / mono', subcategory: 'Bata' },
+  { label: 'Shirt', category: 'Parte superior', subcategory: 'Camisa' },
+  { label: 'Shorts', category: 'Parte inferior', subcategory: 'Pantalón corto' },
+  { label: 'Skirt', category: 'Parte inferior', subcategory: 'Falda' },
+  { label: 'Sweater', category: 'Abrigo', subcategory: 'Jersey' },
+  { label: 'T-shirt', category: 'Parte superior', subcategory: 'Camiseta' },
+  { label: 'Tank top', category: 'Parte superior', subcategory: 'Camiseta de tirantes' },
+  { label: 'Tights', category: 'Parte inferior', subcategory: 'Medias' },
+  { label: 'Top', category: 'Parte superior', subcategory: 'Top' },
+  { label: 'Training top', category: 'Parte superior', subcategory: 'Prenda deportiva' },
+  { label: 'Trousers', category: 'Parte inferior', subcategory: 'Pantalón' },
+  { label: 'Tunic', category: 'Parte superior', subcategory: 'Túnica' },
+  { label: 'Vest', category: 'Abrigo', subcategory: 'Chaleco' },
+  { label: 'Winter jacket', category: 'Abrigo', subcategory: 'Chaqueta de invierno' },
+  { label: 'Winter trousers', category: 'Parte inferior', subcategory: 'Pantalón de invierno' }
 ]
 
-let classifierPromise: Promise<ZeroShotClassifier> | undefined
+let classifierPromise: Promise<ImageClassifier> | undefined
 
 export function mapClothingLabel(label: string): Candidate | undefined {
-  return candidates.find((candidate) => candidate.label === label)
+  const classIndex = /^LABEL_(\d+)$/.exec(label)?.[1]
+  const classLabel = classIndex === undefined ? label : modelClasses[Number(classIndex)]?.label
+  return modelClasses.find((candidate) => candidate.label === classLabel)
 }
 
 function getColorName(red: number, green: number, blue: number): string {
@@ -101,6 +101,24 @@ function getColorName(red: number, green: number, blue: number): string {
 
 function colorBucket(red: number, green: number, blue: number): string {
   return [red, green, blue].map((value) => Math.floor(value / 32)).join(':')
+}
+
+function getLogitValues(output: unknown): number[] {
+  const logits = typeof output === 'object' && output !== null && 'logits' in output
+    ? output.logits
+    : undefined
+  const data = typeof logits === 'object' && logits !== null && 'data' in logits
+    ? logits.data
+    : undefined
+  if (!Array.isArray(data) && !(data instanceof Float32Array) && !(data instanceof Float64Array)) {
+    throw new Error('El modelo no devolvió una salida de clasificación válida.')
+  }
+
+  const values = Array.from(data)
+  if (!values.length || values.some((value) => !Number.isFinite(value))) {
+    throw new Error('El modelo devolvió puntuaciones de clasificación no válidas.')
+  }
+  return values
 }
 
 export function findDominantColor(pixels: ImageData): { color: string; score: number } | undefined {
@@ -208,12 +226,12 @@ async function normalizeImage(image: Blob): Promise<NormalizedImage> {
 }
 
 async function loadClassifier() {
-  const { env, pipeline } = await import('@huggingface/transformers')
+  const { AutoImageProcessor, AutoModelForImageClassification, env } = await import('@huggingface/transformers')
   env.useBrowserCache = true
   env.useWasmCache = false
-  env.allowLocalModels = false
-  env.allowRemoteModels = true
-  env.remotePathTemplate = `{model}/resolve/${CLOTHING_MODEL_VERSION}/`
+  env.allowLocalModels = true
+  env.allowRemoteModels = false
+  env.localModelPath = `${import.meta.env.BASE_URL}models/`
   const wasmEnvironment = env.backends.onnx.wasm
   if (!wasmEnvironment) throw new Error('El runtime WebAssembly de ONNX no está disponible.')
   wasmEnvironment.wasmPaths = {
@@ -221,10 +239,20 @@ async function loadClassifier() {
     mjs: wasmModuleUrl
   }
   if (!classifierPromise) {
-    const pending = pipeline('zero-shot-image-classification', CLOTHING_MODEL_ID, {
-      revision: CLOTHING_MODEL_VERSION,
-      dtype: 'q8'
-    }) as Promise<ZeroShotClassifier>
+    const pending = Promise.all([
+      AutoImageProcessor.from_pretrained(CLOTHING_MODEL_ID),
+      AutoModelForImageClassification.from_pretrained(CLOTHING_MODEL_ID, { dtype: 'q8' })
+    ]).then(([processor, model]): ImageClassifier => async (image) => {
+      const { pixel_values } = await processor(image)
+      const logits = getLogitValues(await model({ pixel_values }))
+      const maximum = Math.max(...logits)
+      const exponentials = logits.map((value) => Math.exp(value - maximum))
+      const denominator = exponentials.reduce((sum, value) => sum + value, 0)
+      return exponentials.map((value, index) => ({
+        label: `LABEL_${index}`,
+        score: value / denominator
+      })).sort((left, right) => right.score - left.score)
+    })
     classifierPromise = pending.catch((error: unknown) => {
       classifierPromise = undefined
       throw error
@@ -239,37 +267,70 @@ async function classifyLocally(image: Blob): Promise<ClothingPrediction[]> {
     loadClassifier()
   ])
   const normalizedImage = await RawImage.fromBlob(image)
-  return classifier(normalizedImage, candidates.map((candidate) => candidate.label))
+  return classifier(normalizedImage)
 }
 
 export async function analyzeGarmentImage(
-  image: Blob,
+  images: Blob | Blob[],
   classify: Classifier = classifyLocally,
   normalize: ImageNormalizer = normalizeImage
 ): Promise<ClothingAnalysisSuggestion> {
-  if (image.size === 0) throw new Error('La imagen está vacía.')
-
-  const normalized = await normalize(image)
-  const predictions = await classify(normalized.blob)
-  const best = predictions[0]
-  if (!best || !Number.isFinite(best.score) || best.score < 0 || best.score > 1) {
-    throw new Error('El clasificador no devolvió una puntuación válida.')
+  const imageList = Array.isArray(images) ? images : [images]
+  if (!imageList.length || imageList.some((image) => image.size === 0)) {
+    throw new Error('Añade al menos una imagen válida.')
   }
-  const match = mapClothingLabel(best.label)
-  if (!match) throw new Error('El clasificador devolvió una etiqueta no reconocida.')
 
-  const dominantColor = findDominantColor(normalized.pixels)
+  const scoresByLabel = new Map<string, number>()
+  const colorCounts = new Map<string, { count: number; confidence: number }>()
+  for (const image of imageList) {
+    const normalized = await normalize(image)
+    const predictions = await classify(normalized.blob)
+    if (!predictions.length || predictions.some((prediction) =>
+      !Number.isFinite(prediction.score) || prediction.score < 0 || prediction.score > 1
+    )) {
+      throw new Error('El clasificador devolvió puntuaciones o etiquetas no válidas.')
+    }
+    for (const prediction of predictions) {
+      if (!mapClothingLabel(prediction.label)) {
+        throw new Error('El clasificador devolvió una etiqueta no reconocida.')
+      }
+      scoresByLabel.set(prediction.label, (scoresByLabel.get(prediction.label) ?? 0) + prediction.score / imageList.length)
+    }
+
+    const dominantColor = findDominantColor(normalized.pixels)
+    if (dominantColor) {
+      const color = colorCounts.get(dominantColor.color) ?? { count: 0, confidence: 0 }
+      color.count += 1
+      color.confidence += dominantColor.score
+      colorCounts.set(dominantColor.color, color)
+    }
+  }
+
+  const classPredictions = [...scoresByLabel.entries()]
+    .map(([label, score]) => ({ label, score, match: mapClothingLabel(label)! }))
+    .sort((left, right) => right.score - left.score)
+  const best = classPredictions[0]
+  if (!best) throw new Error('El clasificador no devolvió ninguna predicción.')
+  const colors = [...colorCounts.entries()]
+    .sort((left, right) => right[1].count - left[1].count || right[1].confidence - left[1].confidence)
+    .slice(0, 3)
+  const dominantColor = colors[0]
   return {
-    category: match.category,
-    subcategory: match.subcategory,
-    colors: dominantColor ? [dominantColor.color] : [],
+    category: best.match.category,
+    subcategory: best.match.subcategory,
+    colors: colors.map(([color]) => color),
+    alternatives: classPredictions.slice(1, 4).map(({ match, score }) => ({
+      category: match.category,
+      subcategory: match.subcategory,
+      score
+    })),
     confidenceByAttribute: {
       category: best.score,
       subcategory: best.score,
-      ...(dominantColor ? { colors: dominantColor.score } : {})
+      ...(dominantColor ? { colors: dominantColor[1].confidence / dominantColor[1].count } : {})
     },
     unknownAttributes: [
-      ...(!dominantColor ? ['colors'] : []),
+      ...(!colors.length ? ['colors'] : []),
       'pattern',
       'sleeveType',
       'neckline',

@@ -11,6 +11,8 @@ export type GarmentCategory = (typeof garmentCategories)[number]
 export type Formality = 'Casual' | 'Smart casual' | 'Formal'
 export type GarmentRole = 'Top' | 'Bottom' | 'Una pieza' | 'Capa' | 'Calzado' | 'Accesorio'
 export type Season = 'Primavera' | 'Verano' | 'Otoño' | 'Invierno'
+export type GarmentAvailability = 'available' | 'laundry' | 'unavailable'
+export type OutfitFeedbackType = 'like' | 'dislike' | 'saved' | 'worn' | 'included' | 'excluded'
 
 export interface GarmentAnalysis {
   modelId: string
@@ -20,9 +22,14 @@ export interface GarmentAnalysis {
     category: GarmentCategory
     subcategory: string
     colors: string[]
+    alternatives?: Array<{
+      category: GarmentCategory
+      subcategory: string
+      score: number
+    }>
   }
   confidenceByAttribute: Partial<Record<'category' | 'subcategory' | 'colors', number>>
-  sourcesByAttribute: Partial<Record<'category' | 'subcategory' | 'colors', 'clip-zero-shot' | 'local-pixels'>>
+  sourcesByAttribute: Partial<Record<'category' | 'subcategory' | 'colors', 'wargon-vit' | 'clip-zero-shot' | 'local-pixels'>>
   unknownAttributes: string[]
   correctedAttributes: string[]
 }
@@ -33,6 +40,7 @@ export interface Garment {
   category: GarmentCategory
   subcategory: string
   colors: string[]
+  pattern?: string
   brand?: string
   size?: string
   notes?: string
@@ -40,7 +48,9 @@ export interface Garment {
   styles: string[]
   formality: Formality
   role: GarmentRole
+  availability?: GarmentAvailability
   image: Blob
+  additionalImages?: Blob[]
   thumbnail: Blob
   width: number
   height: number
@@ -55,7 +65,7 @@ export interface Outfit {
   id: string
   garmentIds: string[]
   occasion: string
-  weather?: { temperatureCelsius: number }
+  weather?: { temperatureCelsius?: number; conditions?: string[] }
   score: number
   createdAt: string
   favorite: boolean
@@ -70,6 +80,14 @@ export interface UserPreferences {
   preferredFormality?: Formality
   feedbackWeights: Record<string, number>
   updatedAt: string
+}
+
+export interface OutfitFeedback {
+  id: string
+  type: OutfitFeedbackType
+  garmentIds: string[]
+  outfitId?: string
+  createdAt: string
 }
 
 export interface TrendPack {

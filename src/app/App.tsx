@@ -5,6 +5,7 @@ import GarmentForm from '../components/GarmentForm'
 import Masonry from '../components/Masonry.jsx'
 import PatternWaves from '../components/PatternWaves.jsx'
 import PillNav from '../components/PillNav.jsx'
+import OutfitGenerator from '../components/OutfitGenerator'
 import { garmentCategories, type Garment } from '../types/domain'
 
 type Page = 'wardrobe' | 'add' | 'outfits'
@@ -137,6 +138,11 @@ function App() {
     await refreshGarments()
   }, [refreshGarments])
 
+  const updateAvailability = useCallback(async (garment: Garment) => {
+    await garmentRepository.update(garment)
+    await refreshGarments()
+  }, [refreshGarments])
+
   function handleNavigation(_item: PillItem, index: number, event: MouseEvent<HTMLAnchorElement | HTMLButtonElement>) {
     event.preventDefault()
     const next = (['wardrobe', 'add', 'outfits'] as const)[index]
@@ -261,15 +267,7 @@ function App() {
           )}
 
           {page === 'outfits' && (
-            <section className="feature-screen" aria-labelledby="outfits-title">
-              <p className="eyebrow">COMBINACIONES CON INTENCIÓN</p>
-              <h1 id="outfits-title">Outfits<span>.</span></h1>
-              <div className="coming-soon">
-                <div className="empty-mark" aria-hidden="true">✳</div>
-                <h2>Próximamente</h2>
-                <p>El generador usará únicamente las prendas guardadas en tu armario.</p>
-              </div>
-            </section>
+            <OutfitGenerator garments={garments} onAvailabilityChange={updateAvailability} />
           )}
         </main>
 

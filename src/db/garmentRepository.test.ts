@@ -56,7 +56,7 @@ describe('garmentRepository', () => {
     const garment = {
       ...makeGarment('garment-analysis'),
       analysis: {
-        modelId: 'Xenova/clip-vit-base-patch32',
+        modelId: 'wargoninnovation/wargon-clothing-classifier',
         modelVersion: 'model-revision',
         analyzedAt: '2026-10-20T11:00:00.000Z',
         suggestions: {
@@ -66,8 +66,8 @@ describe('garmentRepository', () => {
         },
         confidenceByAttribute: { category: 0.42, subcategory: 0.42, colors: 0.8 },
         sourcesByAttribute: {
-          category: 'clip-zero-shot' as const,
-          subcategory: 'clip-zero-shot' as const,
+          category: 'wargon-vit' as const,
+          subcategory: 'wargon-vit' as const,
           colors: 'local-pixels' as const
         },
         unknownAttributes: ['pattern', 'sleeveType', 'neckline'],
@@ -78,9 +78,9 @@ describe('garmentRepository', () => {
 
     expect(await garmentRepository.get(garment.id)).toMatchObject({
       analysis: {
-        modelId: 'Xenova/clip-vit-base-patch32',
+        modelId: 'wargoninnovation/wargon-clothing-classifier',
         confidenceByAttribute: { category: 0.42, subcategory: 0.42, colors: 0.8 },
-        sourcesByAttribute: { category: 'clip-zero-shot', subcategory: 'clip-zero-shot', colors: 'local-pixels' },
+        sourcesByAttribute: { category: 'wargon-vit', subcategory: 'wargon-vit', colors: 'local-pixels' },
         correctedAttributes: ['colors'],
         unknownAttributes: ['pattern', 'sleeveType', 'neckline']
       }

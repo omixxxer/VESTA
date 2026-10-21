@@ -25,15 +25,16 @@ function makePixels(): ImageData {
 }
 
 describe('clothing analyzer', () => {
-  it('maps controlled English model labels to the Vesta taxonomy', () => {
-    expect(mapClothingLabel('a T-shirt')).toMatchObject({
+  it('maps the model class ids and names to the Vesta taxonomy', () => {
+    expect(mapClothingLabel('LABEL_17')).toMatchObject({
       category: 'Parte superior',
       subcategory: 'Camiseta'
     })
-    expect(mapClothingLabel('winter trousers')).toMatchObject({
+    expect(mapClothingLabel('Winter trousers')).toMatchObject({
       category: 'Parte inferior',
       subcategory: 'Pantalón de invierno'
     })
+    expect(mapClothingLabel('LABEL_27')).toBeUndefined()
     expect(mapClothingLabel('unknown label')).toBeUndefined()
   })
 
@@ -50,7 +51,7 @@ describe('clothing analyzer', () => {
     const normalize = vi.fn(async () => ({ blob: normalizedBlob, pixels: makePixels() }))
     const classify = vi.fn(async (received: Blob) => {
       expect(received).toBe(normalizedBlob)
-      return [{ label: 'a T-shirt', score: 0.42 }]
+      return [{ label: 'LABEL_17', score: 0.42 }]
     })
 
     const result = await analyzeGarmentImage(image, classify, normalize)
@@ -69,11 +70,40 @@ describe('clothing analyzer', () => {
     expect(Number.isNaN(Date.parse(result.analyzedAt))).toBe(false)
   })
 
+  it('combines class scores from multiple photos and returns selectable alternatives', async () => {
+    const images = [
+      new Blob(['front'], { type: 'image/jpeg' }),
+      new Blob(['back'], { type: 'image/jpeg' })
+    ]
+    const normalized = new Blob(['normalized'], { type: 'image/jpeg' })
+    const normalize = vi.fn(async () => ({ blob: normalized, pixels: makePixels() }))
+    const classify = vi.fn()
+      .mockResolvedValueOnce([
+        { label: 'LABEL_17', score: 0.7 },
+        { label: 'LABEL_13', score: 0.2 }
+      ])
+      .mockResolvedValueOnce([
+        { label: 'LABEL_13', score: 0.6 },
+        { label: 'LABEL_17', score: 0.3 }
+      ])
+
+    const result = await analyzeGarmentImage(images, classify, normalize)
+
+    expect(normalize).toHaveBeenCalledTimes(2)
+    expect(classify).toHaveBeenCalledTimes(2)
+    expect(result).toMatchObject({
+      category: 'Parte superior',
+      subcategory: 'Camiseta',
+      confidenceByAttribute: { category: 0.5, subcategory: 0.5 },
+      alternatives: [{ category: 'Parte superior', subcategory: 'Camisa', score: 0.4 }]
+    })
+  })
+
   it('rejects missing or unrecognized predictions instead of simulating a result', async () => {
     const image = new Blob(['image'], { type: 'image/jpeg' })
     const normalize = async () => ({ blob: image, pixels: makePixels() })
 
-    await expect(analyzeGarmentImage(image, async () => [], normalize)).rejects.toThrow('puntuación válida')
+    await expect(analyzeGarmentImage(image, async () => [], normalize)).rejects.toThrow('puntuaciones o etiquetas no válidas')
     await expect(analyzeGarmentImage(
       image,
       async () => [{ label: 'unmapped clothing item', score: 0.8 }],
