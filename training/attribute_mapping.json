@@ -1,0 +1,60 @@
+{
+  "_comment": "Mapeo de atributos de Fashionpedia a las cabezas de taxonomy.json. Cada cabeza filtra por 'supercategory' (regex sobre el campo supercategory del atributo) y asigna valores con regex sobre el nombre del atributo (minúsculas). ESTOS PATRONES SON UNA PRIMERA PROPUESTA: ejecuta `python inspect_ontology.py` con el JSON real para ver los nombres exactos y la cobertura, y ajusta aquí lo que haga falta. Los atributos sin mapear se ignoran (etiqueta 'sin dato').",
+  "pattern": {
+    "supercategory": "pattern",
+    "values": {
+      "plain": ["^plain"],
+      "striped": ["stripe", "pinstripe"],
+      "checked": ["check", "plaid", "gingham", "houndstooth", "argyle"],
+      "floral": ["floral", "flower"],
+      "dotted": ["\\bdot\\b", "polka"],
+      "animal": ["leopard", "zebra", "snakeskin", "cheetah", "giraffe", "animal"],
+      "camouflage": ["camouflage"],
+      "other_print": ["abstract", "geometric", "paisley", "chevron", "herringbone", "fair isle", "cartoon", "letters", "toile", "plant", "peacock"]
+    }
+  },
+  "neckline": {
+    "supercategory": "neckline|collar",
+    "values": {
+      "round": ["round", "crew", "scoop", "bateau"],
+      "v_neck": ["v-neck", "v neck", "plunging"],
+      "square": ["square"],
+      "high": ["turtle", "high", "mock", "funnel"],
+      "collared": ["collar", "lapel", "shirt collar", "polo", "notched"],
+      "off_shoulder": ["off-the-shoulder", "off the shoulder", "one shoulder", "asymmetric"],
+      "halter": ["halter", "strapless", "sweetheart"],
+      "hooded": ["hood"]
+    }
+  },
+  "sleeve_length": {
+    "supercategory": "length",
+    "only_for_categories": ["shirt, blouse", "top, t-shirt, sweatshirt", "sweater", "cardigan", "jacket", "coat", "dress", "jumpsuit"],
+    "values": {
+      "sleeveless": ["sleeveless", "strapless"],
+      "short": ["short sleeve", "short-sleeve", "cap sleeve"],
+      "three_quarter": ["three quarter", "3/4", "elbow"],
+      "long": ["long sleeve", "long-sleeve", "wrist"]
+    }
+  },
+  "fit": {
+    "supercategory": "silhouette",
+    "values": {
+      "fitted": ["fitted", "slim", "tight", "bodycon", "skinny", "pencil", "tailored"],
+      "regular": ["regular", "straight", "symmetrical"],
+      "loose": ["loose", "oversize", "relaxed", "wide", "baggy", "boxy", "a-line", "peg"]
+    }
+  },
+  "myntra_usage_to_formality": {
+    "Casual": "casual",
+    "Smart Casual": "smart_casual",
+    "Formal": "formal",
+    "Sports": "casual",
+    "Party": "smart_casual"
+  },
+  "myntra_season_to_season": {
+    "Spring": "spring",
+    "Summer": "summer",
+    "Fall": "autumn",
+    "Winter": "winter"
+  }
+}

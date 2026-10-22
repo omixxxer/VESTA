@@ -1,0 +1,114 @@
+{
+  "version": "0.1.0",
+  "description": "Taxonomía de VESTA para el clasificador multi-cabeza. Las claves son estables (inglés, snake_case); las etiquetas en español son las que muestra la app.",
+  "heads": {
+    "category": {
+      "kind": "single",
+      "values": {
+        "top": { "es": "Parte superior", "app_category": "Parte superior" },
+        "bottom": { "es": "Parte inferior", "app_category": "Parte inferior" },
+        "one_piece": { "es": "Vestido / mono", "app_category": "Vestido / mono" },
+        "outerwear": { "es": "Abrigo", "app_category": "Abrigo" },
+        "footwear": { "es": "Calzado", "app_category": "Calzado" },
+        "accessory": { "es": "Accesorio", "app_category": "Accesorio" }
+      }
+    },
+    "subtype": {
+      "kind": "single",
+      "values": {
+        "shirt_blouse": { "es": "Camisa / blusa", "category": "top", "fashionpedia": ["shirt, blouse"], "myntra": ["Shirts", "Tops", "Tunics", "Kurtis"] },
+        "tshirt_sweatshirt": { "es": "Camiseta / sudadera", "category": "top", "fashionpedia": ["top, t-shirt, sweatshirt"], "myntra": ["Tshirts", "Sweatshirts", "Tank Tops", "Camisoles"] },
+        "sweater": { "es": "Jersey", "category": "outerwear", "fashionpedia": ["sweater"], "myntra": ["Sweaters", "Pullover"] },
+        "cardigan": { "es": "Cárdigan", "category": "outerwear", "fashionpedia": ["cardigan"], "myntra": ["Shrug"] },
+        "jacket": { "es": "Chaqueta", "category": "outerwear", "fashionpedia": ["jacket"], "myntra": ["Jackets", "Blazers", "Rain Jacket", "Waistcoat"] },
+        "vest": { "es": "Chaleco", "category": "outerwear", "fashionpedia": ["vest"], "myntra": ["Nehru Jackets"] },
+        "coat": { "es": "Abrigo largo", "category": "outerwear", "fashionpedia": ["coat"], "myntra": ["Coats"] },
+        "cape": { "es": "Capa / poncho", "category": "outerwear", "fashionpedia": ["cape"], "myntra": ["Shawls", "Stoles"] },
+        "pants": { "es": "Pantalón", "category": "bottom", "fashionpedia": ["pants"], "myntra": ["Jeans", "Trousers", "Track Pants", "Leggings", "Jeggings", "Capris", "Patiala", "Salwar"] },
+        "shorts": { "es": "Pantalón corto", "category": "bottom", "fashionpedia": ["shorts"], "myntra": ["Shorts", "Trunk"] },
+        "skirt": { "es": "Falda", "category": "bottom", "fashionpedia": ["skirt"], "myntra": ["Skirts"] },
+        "dress": { "es": "Vestido", "category": "one_piece", "fashionpedia": ["dress"], "myntra": ["Dresses", "Kurta Sets", "Sarees", "Lehenga Choli"] },
+        "jumpsuit": { "es": "Mono", "category": "one_piece", "fashionpedia": ["jumpsuit"], "myntra": ["Jumpsuit", "Rompers", "Dungarees"] },
+        "tights": { "es": "Medias / leotardos", "category": "bottom", "fashionpedia": ["tights, stockings"], "myntra": ["Stockings"] },
+        "leg_warmer": { "es": "Calentadores", "category": "accessory", "fashionpedia": ["leg warmer"], "myntra": [] },
+        "sock": { "es": "Calcetines", "category": "footwear", "fashionpedia": ["sock"], "myntra": ["Socks"] },
+        "shoe": { "es": "Calzado", "category": "footwear", "fashionpedia": ["shoe"], "myntra": ["Casual Shoes", "Formal Shoes", "Sports Shoes", "Sandals", "Flip Flops", "Heels", "Flats", "Sports Sandals", "Boots"] },
+        "bag": { "es": "Bolso / cartera", "category": "accessory", "fashionpedia": ["bag, wallet"], "myntra": ["Handbags", "Backpacks", "Clutches", "Wallets", "Laptop Bag", "Duffel Bag"] },
+        "scarf": { "es": "Bufanda / pañuelo", "category": "accessory", "fashionpedia": ["scarf"], "myntra": ["Scarves", "Mufflers", "Dupatta"] },
+        "hat": { "es": "Gorro / sombrero", "category": "accessory", "fashionpedia": ["hat"], "myntra": ["Caps", "Hat"] },
+        "headwear": { "es": "Diadema / accesorio de pelo", "category": "accessory", "fashionpedia": ["headband, head covering, hair accessory"], "myntra": ["Hair Accessory", "Headband"] },
+        "glove": { "es": "Guantes", "category": "accessory", "fashionpedia": ["glove"], "myntra": ["Gloves"] },
+        "belt": { "es": "Cinturón", "category": "accessory", "fashionpedia": ["belt"], "myntra": ["Belts"] },
+        "tie": { "es": "Corbata", "category": "accessory", "fashionpedia": ["tie"], "myntra": ["Ties", "Bow Tie"] },
+        "glasses": { "es": "Gafas", "category": "accessory", "fashionpedia": ["glasses"], "myntra": ["Sunglasses"] },
+        "watch": { "es": "Reloj", "category": "accessory", "fashionpedia": ["watch"], "myntra": ["Watches"] },
+        "umbrella": { "es": "Paraguas", "category": "accessory", "fashionpedia": ["umbrella"], "myntra": [] }
+      }
+    },
+    "pattern": {
+      "kind": "single",
+      "values": {
+        "plain": { "es": "Liso" },
+        "striped": { "es": "Rayas" },
+        "checked": { "es": "Cuadros" },
+        "floral": { "es": "Floral" },
+        "dotted": { "es": "Lunares" },
+        "animal": { "es": "Animal print" },
+        "camouflage": { "es": "Camuflaje" },
+        "other_print": { "es": "Otro estampado" }
+      }
+    },
+    "neckline": {
+      "kind": "single",
+      "values": {
+        "round": { "es": "Cuello redondo" },
+        "v_neck": { "es": "Cuello en V" },
+        "square": { "es": "Cuello cuadrado" },
+        "high": { "es": "Cuello alto" },
+        "collared": { "es": "Con cuello / solapa" },
+        "off_shoulder": { "es": "Hombros descubiertos" },
+        "halter": { "es": "Halter / sin tirantes" },
+        "hooded": { "es": "Capucha" }
+      }
+    },
+    "sleeve_length": {
+      "kind": "single",
+      "values": {
+        "sleeveless": { "es": "Sin mangas" },
+        "short": { "es": "Manga corta" },
+        "three_quarter": { "es": "Manga 3/4" },
+        "long": { "es": "Manga larga" }
+      }
+    },
+    "fit": {
+      "kind": "single",
+      "values": {
+        "fitted": { "es": "Ajustado" },
+        "regular": { "es": "Regular" },
+        "loose": { "es": "Holgado / oversize" }
+      }
+    },
+    "formality": {
+      "kind": "single",
+      "values": {
+        "casual": { "es": "Casual" },
+        "smart_casual": { "es": "Smart casual" },
+        "formal": { "es": "Formal" }
+      }
+    },
+    "season": {
+      "kind": "single",
+      "values": {
+        "spring": { "es": "Primavera" },
+        "summer": { "es": "Verano" },
+        "autumn": { "es": "Otoño" },
+        "winter": { "es": "Invierno" }
+      }
+    }
+  },
+  "notes": [
+    "El color NO es una cabeza del modelo: la app lo sigue calculando con análisis de píxeles (findDominantColor).",
+    "'category' se deriva de 'subtype' al preparar los datos; el modelo mantiene ambas cabezas para poder detectar incoherencias.",
+    "Las cabezas sin etiquetas suficientes en el dataset (p. ej. formality/season sin el adaptador Myntra) se excluyen del entrenamiento y de la exportación."
+  ]
+}
