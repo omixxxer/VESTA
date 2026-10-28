@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "categories": [
+    { "id": "top", "label": "Parte superior", "role": "Top" },
+    { "id": "bottom", "label": "Parte inferior", "role": "Bottom" },
+    { "id": "one-piece", "label": "Vestido / mono", "role": "Una pieza" },
+    { "id": "outerwear", "label": "Abrigo", "role": "Capa" },
+    { "id": "footwear", "label": "Calzado", "role": "Calzado" },
+    { "id": "accessory", "label": "Accesorio", "role": "Accesorio" }
+  ],
+  "subcategories": [
+    { "id": "camiseta", "label": "Camiseta", "category": "top", "synonyms": ["t-shirt", "camiseta de manga corta", "camiseta basica"] },
+    { "id": "camiseta-manga-larga", "label": "Camiseta de manga larga", "category": "top", "synonyms": ["longsleeve", "camiseta manga larga"] },
+    { "id": "camiseta-tirantes", "label": "Camiseta de tirantes", "category": "top", "synonyms": ["tank top", "top de tirantes", "tirantes"] },
+    { "id": "polo", "label": "Polo", "category": "top", "synonyms": [] },
+    { "id": "camisa", "label": "Camisa", "category": "top", "synonyms": [] },
+    { "id": "blusa", "label": "Blusa", "category": "top", "synonyms": [] },
+    { "id": "top", "label": "Top", "category": "top", "synonyms": ["crop top", "body"] },
+    { "id": "jersey", "label": "Jersey", "category": "top", "synonyms": ["sueter", "pullover", "jersey de punto"] },
+    { "id": "sudadera", "label": "Sudadera", "category": "top", "synonyms": ["sudadera sin capucha", "sweatshirt"] },
+    { "id": "sudadera-capucha", "label": "Sudadera con capucha", "category": "top", "synonyms": ["hoodie"] },
+    { "id": "prenda-deportiva", "label": "Prenda deportiva", "category": "top", "synonyms": ["camiseta deportiva", "top deportivo"] },
+    { "id": "tunica", "label": "Túnica", "category": "top", "synonyms": [] },
+
+    { "id": "pantalon", "label": "Pantalón", "category": "bottom", "synonyms": ["pantalones", "chino", "chinos", "pantalon de vestir", "pantalon de invierno", "pantalon impermeable"] },
+    { "id": "vaqueros", "label": "Vaqueros", "category": "bottom", "synonyms": ["jeans", "tejanos", "pantalon vaquero"] },
+    { "id": "pantalon-corto", "label": "Pantalón corto", "category": "bottom", "synonyms": ["shorts", "bermudas", "bermuda"] },
+    { "id": "pantalon-chandal", "label": "Pantalón de chándal", "category": "bottom", "synonyms": ["chandal", "jogger", "joggers", "sweatpants"] },
+    { "id": "leggings", "label": "Leggings", "category": "bottom", "synonyms": ["mallas"] },
+    { "id": "falda", "label": "Falda", "category": "bottom", "synonyms": [] },
+    { "id": "medias", "label": "Medias", "category": "bottom", "synonyms": ["panties", "media"] },
+
+    { "id": "vestido", "label": "Vestido", "category": "one-piece", "synonyms": [] },
+    { "id": "mono", "label": "Mono", "category": "one-piece", "synonyms": ["jumpsuit", "peto"] },
+
+    { "id": "chaqueta", "label": "Chaqueta", "category": "outerwear", "synonyms": ["cazadora", "bomber"] },
+    { "id": "blazer", "label": "Blazer", "category": "outerwear", "synonyms": ["americana"] },
+    { "id": "abrigo", "label": "Abrigo", "category": "outerwear", "synonyms": ["gabardina", "trench", "parka"] },
+    { "id": "plumifero", "label": "Plumífero", "category": "outerwear", "synonyms": ["puffer", "chaqueta de invierno", "anorak acolchado"] },
+    { "id": "chubasquero", "label": "Chubasquero", "category": "outerwear", "synonyms": ["impermeable", "raincoat"] },
+    { "id": "cardigan", "label": "Cárdigan", "category": "outerwear", "synonyms": ["rebeca", "chaqueta de punto"] },
+    { "id": "chaleco", "label": "Chaleco", "category": "outerwear", "synonyms": [] },
+
+    { "id": "zapatillas", "label": "Zapatillas", "category": "footwear", "synonyms": ["deportivas", "sneakers", "tenis"] },
+    { "id": "zapatos", "label": "Zapatos", "category": "footwear", "synonyms": ["zapato", "mocasines", "mocasin"] },
+    { "id": "botas", "label": "Botas", "category": "footwear", "synonyms": ["bota", "botines", "botin"] },
+    { "id": "sandalias", "label": "Sandalias", "category": "footwear", "synonyms": ["sandalia", "chanclas"] },
+    { "id": "tacones", "label": "Tacones", "category": "footwear", "synonyms": ["zapatos de tacon"] },
+
+    { "id": "gorro", "label": "Gorro / sombrero", "category": "accessory", "synonyms": ["gorro", "sombrero", "gorra"] },
+    { "id": "bolso", "label": "Bolso", "category": "accessory", "synonyms": ["mochila", "cartera", "bandolera"] },
+    { "id": "cinturon", "label": "Cinturón", "category": "accessory", "synonyms": [] },
+    { "id": "bufanda", "label": "Bufanda / pañuelo", "category": "accessory", "synonyms": ["bufanda", "panuelo", "foulard"] },
+    { "id": "gafas", "label": "Gafas", "category": "accessory", "synonyms": ["gafas de sol"] },
+    { "id": "corbata", "label": "Corbata", "category": "accessory", "synonyms": ["pajarita"] },
+    { "id": "reloj", "label": "Reloj", "category": "accessory", "synonyms": [] }
+  ],
+  "attributes": {
+    "sleeve": {
+      "multiLabel": false,
+      "appliesTo": ["top", "one-piece", "outerwear"],
+      "values": [
+        { "id": "sin-mangas", "label": "Sin mangas", "synonyms": ["sleeveless"] },
+        { "id": "corta", "label": "Manga corta", "synonyms": ["corta"] },
+        { "id": "tres-cuartos", "label": "Manga francesa", "synonyms": ["tres cuartos", "manga tres cuartos"] },
+        { "id": "larga", "label": "Manga larga", "synonyms": ["larga"] }
+      ]
+    },
+    "pattern": {
+      "multiLabel": false,
+      "values": [
+        { "id": "liso", "label": "Liso", "synonyms": ["sin estampado", "uni"] },
+        { "id": "rayas", "label": "Rayas", "synonyms": ["rayado", "a rayas", "raya"] },
+        { "id": "cuadros", "label": "Cuadros", "synonyms": ["a cuadros", "tartan", "vichy", "pata de gallo"] },
+        { "id": "lunares", "label": "Lunares", "synonyms": ["topos", "de lunares"] },
+        { "id": "floral", "label": "Floral", "synonyms": ["flores", "de flores"] },
+        { "id": "animal", "label": "Animal print", "synonyms": ["leopardo", "cebra", "serpiente", "animal"] },
+        { "id": "camuflaje", "label": "Camuflaje", "synonyms": ["militar"] },
+        { "id": "geometrico", "label": "Geométrico", "synonyms": ["rombos", "espiga", "zigzag"] },
+        { "id": "grafico", "label": "Gráfico / letras", "synonyms": ["letras", "logo", "dibujo", "grafico", "estampado grafico"] },
+        { "id": "otro", "label": "Otro estampado", "synonyms": ["estampado", "cachemir", "abstracto"] }
+      ]
+    },
+    "formality": {
+      "multiLabel": false,
+      "values": [
+        { "id": "casual", "label": "Casual", "synonyms": [] },
+        { "id": "smart-casual", "label": "Smart casual", "synonyms": [] },
+        { "id": "formal", "label": "Formal", "synonyms": [] }
+      ]
+    },
+    "seasons": {
+      "multiLabel": true,
+      "values": [
+        { "id": "primavera", "label": "Primavera", "synonyms": [] },
+        { "id": "verano", "label": "Verano", "synonyms": [] },
+        { "id": "otono", "label": "Otoño", "synonyms": [] },
+        { "id": "invierno", "label": "Invierno", "synonyms": [] }
+      ]
+    },
+    "colors": {
+      "multiLabel": true,
+      "values": [
+        { "id": "negro", "label": "Negro", "synonyms": [] },
+        { "id": "blanco", "label": "Blanco", "synonyms": ["crudo", "hueso"] },
+        { "id": "gris", "label": "Gris", "synonyms": ["gris claro", "gris oscuro", "antracita", "plata"] },
+        { "id": "beige", "label": "Beige", "synonyms": ["crema", "arena", "camel"] },
+        { "id": "marron", "label": "Marrón", "synonyms": ["chocolate", "tostado"] },
+        { "id": "rojo", "label": "Rojo", "synonyms": ["granate", "burdeos", "vino"] },
+        { "id": "naranja", "label": "Naranja", "synonyms": ["teja", "coral"] },
+        { "id": "amarillo", "label": "Amarillo", "synonyms": ["mostaza", "dorado"] },
+        { "id": "verde", "label": "Verde", "synonyms": ["caqui", "oliva", "verde militar", "menta"] },
+        { "id": "azul", "label": "Azul", "synonyms": ["celeste", "azul claro", "turquesa", "azul cielo"] },
+        { "id": "azul-marino", "label": "Azul marino", "synonyms": ["marino", "navy"] },
+        { "id": "morado", "label": "Morado", "synonyms": ["lila", "malva", "violeta", "lavanda"] },
+        { "id": "rosa", "label": "Rosa", "synonyms": ["fucsia", "rosa palo"] },
+        { "id": "multicolor", "label": "Multicolor", "synonyms": ["varios colores"] }
+      ]
+    }
+  }
+}
