@@ -36,6 +36,13 @@ export class WardrobeDatabase extends Dexie {
       trendPacks: 'id, version, publishedAt',
       outfitFeedback: 'id, type, createdAt'
     })
+    this.version(4).stores({
+      garments: 'id, category, name, updatedAt',
+      outfits: 'id, createdAt, favorite, kind',
+      preferences: 'id',
+      trendPacks: 'id, version, publishedAt',
+      outfitFeedback: 'id, type, createdAt'
+    })
   }
 }
 

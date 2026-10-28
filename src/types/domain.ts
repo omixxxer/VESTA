@@ -65,6 +65,8 @@ export interface Outfit {
   id: string
   garmentIds: string[]
   occasion: string
+  kind?: 'generated' | 'manual'
+  name?: string
   weather?: { temperatureCelsius?: number; conditions?: string[] }
   score: number
   createdAt: string

@@ -313,6 +313,7 @@ export function createOutfitRecord(candidate: OutfitCandidate, context: OutfitCo
     id: crypto.randomUUID(),
     garmentIds: candidate.garments.map((garment) => garment.id),
     occasion: context.occasion,
+    kind: 'generated',
     weather: context.temperatureCelsius === undefined && !context.weatherConditions?.length
       ? undefined
       : { temperatureCelsius: context.temperatureCelsius, conditions: context.weatherConditions },

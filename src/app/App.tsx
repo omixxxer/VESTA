@@ -6,9 +6,10 @@ import Masonry from '../components/Masonry.jsx'
 import PatternWaves from '../components/PatternWaves.jsx'
 import PillNav from '../components/PillNav.jsx'
 import OutfitGenerator from '../components/OutfitGenerator'
+import TripPlanner from '../components/TripPlanner'
 import { garmentCategories, type Garment } from '../types/domain'
 
-type Page = 'wardrobe' | 'add' | 'outfits'
+type Page = 'wardrobe' | 'add' | 'outfits' | 'packing'
 
 type GalleryItem = {
   id: string
@@ -29,14 +30,15 @@ type PillItem = {
 
 const navigation: PillItem[] = [
   { label: 'Armario', href: '#armario', icon: '▦' },
-  { label: 'Añadir', href: '#anadir', icon: '＋' },
-  { label: 'Outfits', href: '#outfits', icon: '✳' }
+  { label: 'Outfits', href: '#outfits', icon: '✳' },
+  { label: 'Maleta', href: '#maleta', icon: '▣' }
 ]
 
 const pageHrefs: Record<Page, string> = {
   wardrobe: '#armario',
-  add: '#anadir',
-  outfits: '#outfits'
+  add: '#armario',
+  outfits: '#outfits',
+  packing: '#maleta'
 }
 
 const localStorageMessage = 'Tus prendas y fotografías se guardan únicamente en este dispositivo.'
@@ -49,6 +51,7 @@ function App() {
   const [page, setPage] = useState<Page>('wardrobe')
   const [garments, setGarments] = useState<Garment[]>([])
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([])
+  const [displayCount, setDisplayCount] = useState(40)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedGarment, setSelectedGarment] = useState<Garment | null>(null)
@@ -76,9 +79,26 @@ function App() {
       .finally(() => setLoading(false))
   }, [refreshGarments])
 
+  const visibleGarments = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase('es')
+    return garments.filter((garment) => {
+      const searchableText = [garment.name, garment.subcategory, garment.brand, ...garment.colors]
+        .filter(Boolean)
+        .join(' ')
+        .toLocaleLowerCase('es')
+      return (!normalizedSearch || searchableText.includes(normalizedSearch))
+        && (categoryFilter === 'Todas' || garment.category === categoryFilter)
+    })
+  }, [categoryFilter, garments, search])
+
+  const visibleGalleryItems = useMemo(() => {
+    const visibleIds = new Set(visibleGarments.map((garment) => garment.id))
+    return galleryItems.filter((item) => visibleIds.has(item.garmentId))
+  }, [galleryItems, visibleGarments])
+
   useEffect(() => {
     const urls: string[] = []
-    const items = garments.map((garment) => {
+    const items = visibleGarments.slice(0, displayCount).map((garment) => {
       const img = URL.createObjectURL(garment.thumbnail ?? garment.image)
       urls.push(img)
       const label = getGarmentLabel(garment)
@@ -96,25 +116,7 @@ function App() {
     })
     setGalleryItems(items)
     return () => urls.forEach((url) => URL.revokeObjectURL(url))
-  }, [garments])
-
-  const visibleGarments = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase('es')
-    return garments.filter((garment) => {
-      const searchableText = [garment.name, garment.subcategory, garment.brand, ...garment.colors]
-        .filter(Boolean)
-        .join(' ')
-        .toLocaleLowerCase('es')
-      return (!normalizedSearch || searchableText.includes(normalizedSearch))
-        && (categoryFilter === 'Todas' || garment.category === categoryFilter)
-    })
-  }, [categoryFilter, garments, search])
-
-  const visibleIds = useMemo(() => new Set(visibleGarments.map((garment) => garment.id)), [visibleGarments])
-  const visibleGalleryItems = useMemo(
-    () => galleryItems.filter((item) => visibleIds.has(item.garmentId)),
-    [galleryItems, visibleIds]
-  )
+  }, [displayCount, visibleGarments])
 
   const closeDetail = useCallback(() => setSelectedGarment(null), [])
 
@@ -145,7 +147,7 @@ function App() {
 
   function handleNavigation(_item: PillItem, index: number, event: MouseEvent<HTMLAnchorElement | HTMLButtonElement>) {
     event.preventDefault()
-    const next = (['wardrobe', 'add', 'outfits'] as const)[index]
+    const next = (['wardrobe', 'outfits', 'packing'] as const)[index]
     if (next) setPage(next)
   }
 
@@ -197,7 +199,7 @@ function App() {
                   <h1 id="wardrobe-title">Armario<span>.</span></h1>
                   <p className="page-intro">Cada prenda cuenta una historia. Aquí empieza la tuya.</p>
                 </div>
-                <button className="button button-dark desktop-add" type="button" onClick={() => setPage('add')}>＋ Añadir prenda</button>
+                <button className="button button-dark" type="button" onClick={() => setPage('add')}>＋ Añadir prenda</button>
               </div>
 
               <div className="wardrobe-toolbar">
@@ -206,10 +208,10 @@ function App() {
                   <label className="search-field">
                     <span aria-hidden="true">⌕</span>
                     <span className="visually-hidden">Buscar prendas</span>
-                    <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en tu armario" />
+                    <input value={search} onChange={(event) => { setSearch(event.target.value); setDisplayCount(40) }} placeholder="Buscar en tu armario" />
                   </label>
                   <label className="visually-hidden" htmlFor="category-filter">Filtrar por categoría</label>
-                  <select id="category-filter" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                  <select id="category-filter" value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setDisplayCount(40) }}>
                     <option>Todas</option>
                     {garmentCategories.map((category) => <option key={category}>{category}</option>)}
                   </select>
@@ -218,9 +220,7 @@ function App() {
 
               {loading ? (
                 <div className="loading-state" role="status">Abriendo tu armario…</div>
-              ) : garments.length > 0 && galleryItems.length === 0 ? (
-                <div className="loading-state" role="status">Preparando fotografías…</div>
-              ) : visibleGalleryItems.length === 0 ? (
+              ) : visibleGarments.length === 0 ? (
                 <section className="empty-state">
                   <div className="empty-mark" aria-hidden="true">✳</div>
                   <p className="eyebrow">{garments.length === 0 ? 'UN BUEN COMIENZO' : 'PRUEBA OTRA BÚSQUEDA'}</p>
@@ -230,6 +230,8 @@ function App() {
                     : 'Cambia el texto o la categoría para ver más resultados.'}</p>
                   {garments.length === 0 && <button className="button button-dark" type="button" onClick={() => setPage('add')}>Añadir primera prenda ↗</button>}
                 </section>
+              ) : visibleGalleryItems.length === 0 ? (
+                <div className="loading-state" role="status">Preparando fotografías…</div>
               ) : (
                 <Masonry
                   items={visibleGalleryItems}
@@ -250,6 +252,12 @@ function App() {
                   className="wardrobe-masonry"
                 />
               )}
+              {visibleGalleryItems.length < visibleGarments.length && !loading && (
+                <div className="catalog-more">
+                  <p>Mostrando {visibleGalleryItems.length} de {visibleGarments.length} prendas.</p>
+                  <button className="button button-outline" type="button" onClick={() => setDisplayCount((count) => count + 40)}>Cargar 40 más</button>
+                </div>
+              )}
             </section>
           )}
 
@@ -269,6 +277,7 @@ function App() {
           {page === 'outfits' && (
             <OutfitGenerator garments={garments} onAvailabilityChange={updateAvailability} />
           )}
+          {page === 'packing' && <TripPlanner garments={garments} />}
         </main>
 
         <PillNav

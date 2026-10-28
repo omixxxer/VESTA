@@ -60,10 +60,32 @@ describe('OutfitGenerator', () => {
       ])
     })
     expect((await database.outfits.toArray()).filter((outfit) => outfit.favorite)).toHaveLength(1)
-    expect(screen.getByRole('heading', { name: 'Favoritos e historial local' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Guardados' }))
+    expect(screen.getByRole('heading', { name: 'Outfits guardados' })).toBeInTheDocument()
+    expect(screen.getByText(/GENERADO Y GUARDADO · \d+(?:\.\d+)?\/100/)).toBeInTheDocument()
     rendered.unmount()
     render(<OutfitGenerator {...props} />)
-    expect(await screen.findByRole('heading', { name: 'Favoritos e historial local' })).toBeInTheDocument()
+    await user.click(await screen.findByRole('tab', { name: 'Guardados' }))
+    expect(await screen.findByRole('heading', { name: 'Outfits guardados' })).toBeInTheDocument()
+  })
+
+  it('creates a personal outfit from selected garments and persists it', async () => {
+    await database.open()
+    const garments = [makeGarment('shirt', 'Top'), makeGarment('trousers', 'Bottom')]
+    const user = userEvent.setup()
+    render(<OutfitGenerator garments={garments} onAvailabilityChange={vi.fn().mockResolvedValue(undefined)} />)
+
+    await user.click(screen.getByRole('tab', { name: 'Crear outfit' }))
+    await user.type(screen.getByLabelText('Nombre del outfit'), 'Mi conjunto')
+    await user.click(screen.getByLabelText('shirt'))
+    await user.click(screen.getByLabelText('trousers'))
+    await user.click(screen.getByRole('button', { name: 'Guardar outfit' }))
+
+    await waitFor(async () => expect(await database.outfits.toArray()).toEqual([
+      expect.objectContaining({ name: 'Mi conjunto', kind: 'manual', garmentIds: ['shirt', 'trousers'] })
+    ]))
+    expect(screen.getByRole('heading', { name: 'Outfits guardados' })).toBeInTheDocument()
+    expect(screen.getByText('Mi conjunto')).toBeInTheDocument()
   })
 
   it('persists and resets personal preference settings', async () => {

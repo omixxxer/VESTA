@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type TouchEvent } from 'react'
 import { database } from '../db/database'
 import type { Garment, Outfit, UserPreferences } from '../types/domain'
 import GarmentPhoto from './GarmentPhoto'
+import { getCityForecast } from '../weather/openMeteo'
 import {
   createOutfitFeedback,
   createOutfitRecord,
@@ -25,6 +26,13 @@ const emptyPreferences: UserPreferences = {
   feedbackWeights: {},
   updatedAt: ''
 }
+type OutfitView = 'generate' | 'saved' | 'create'
+
+function tomorrow() {
+  const date = new Date()
+  date.setDate(date.getDate() + 1)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
 
 function garmentLabel(garment: Garment) {
   return garment.name.trim() || garment.subcategory || garment.category
@@ -32,9 +40,15 @@ function garmentLabel(garment: Garment) {
 
 export default function OutfitGenerator({ garments, onAvailabilityChange }: OutfitGeneratorProps) {
   const [occasion, setOccasion] = useState<OutfitTemplate>('Casual')
+  const [view, setView] = useState<OutfitView>('generate')
   const [desiredStyle, setDesiredStyle] = useState('')
   const [temperature, setTemperature] = useState('')
   const [conditions, setConditions] = useState('')
+  const [weatherCity, setWeatherCity] = useState('')
+  const [weatherLoading, setWeatherLoading] = useState(false)
+  const [manualName, setManualName] = useState('')
+  const [manualIds, setManualIds] = useState<string[]>([])
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
   const [includedIds, setIncludedIds] = useState<string[]>([])
   const [excludedIds, setExcludedIds] = useState<string[]>([])
   const [preferences, setPreferences] = useState<UserPreferences>(emptyPreferences)
@@ -113,6 +127,53 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
     }
   }
 
+  async function loadTomorrowWeather() {
+    setError('')
+    setWeatherLoading(true)
+    try {
+      const forecast = await getCityForecast(weatherCity, tomorrow(), 1)
+      const [tomorrowsWeather] = forecast
+      if (!tomorrowsWeather) throw new Error('No hay previsión disponible para mañana.')
+      setTemperature(String(tomorrowsWeather.temperatureCelsius))
+      setConditions(tomorrowsWeather.conditions.join(', '))
+      setNotice(`Tiempo de mañana en ${weatherCity.trim()}: ${tomorrowsWeather.temperatureCelsius} °C, ${tomorrowsWeather.conditions.join(', ')}.`)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'No se pudo consultar el pronóstico.')
+    } finally {
+      setWeatherLoading(false)
+    }
+  }
+
+  async function saveManualOutfit() {
+    setError('')
+    setNotice('')
+    const chosenGarments = garments.filter((garment) => manualIds.includes(garment.id))
+    if (!chosenGarments.length) {
+      setError('Selecciona al menos una prenda para crear el outfit.')
+      return
+    }
+    try {
+      const outfit: Outfit = {
+        id: crypto.randomUUID(),
+        garmentIds: chosenGarments.map((garment) => garment.id),
+        occasion: 'Personalizado',
+        kind: 'manual',
+        name: manualName.trim() || `Outfit ${new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(new Date())}`,
+        score: 100,
+        createdAt: new Date().toISOString(),
+        favorite: true
+      }
+      await database.outfits.put(outfit)
+      setSavedHistory(await database.outfits.orderBy('createdAt').reverse().limit(20).toArray())
+      setManualName('')
+      setManualIds([])
+      setView('saved')
+      setNotice('Outfit guardado en este dispositivo.')
+    } catch {
+      setError('No se pudo guardar el outfit personalizado.')
+    }
+  }
+
   async function recordFeedback(type: 'like' | 'dislike' | 'saved' | 'worn', entry: { candidate: OutfitCandidate; outfit: Outfit }) {
     setError('')
     try {
@@ -146,6 +207,19 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
     }
   }
 
+  function finishSwipe(event: TouchEvent<HTMLElement>, entry: { candidate: OutfitCandidate; outfit: Outfit }) {
+    const start = touchStart.current
+    touchStart.current = null
+    if (!start) return
+    const touch = event.changedTouches[0]
+    if (!touch) return
+    const deltaX = touch.clientX - start.x
+    const deltaY = touch.clientY - start.y
+    if (Math.abs(deltaX) > 90 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      void recordFeedback(deltaX > 0 ? 'like' : 'dislike', entry)
+    }
+  }
+
   async function changeAvailability(garment: Garment, availability: Garment['availability']) {
     setError('')
     try {
@@ -165,6 +239,13 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
       {notice && <p className="outfit-notice" role="status">{notice}</p>}
       {garments.length === 0 && <p className="outfit-notice" role="status">El armario aún no tiene prendas. Añade prendas para poder generar combinaciones.</p>}
 
+      <div className="outfit-tabs" role="tablist" aria-label="Secciones de outfits">
+        <button type="button" role="tab" aria-selected={view === 'generate'} onClick={() => setView('generate')}>Generar</button>
+        <button type="button" role="tab" aria-selected={view === 'saved'} onClick={() => setView('saved')}>Guardados</button>
+        <button type="button" role="tab" aria-selected={view === 'create'} onClick={() => setView('create')}>Crear outfit</button>
+      </div>
+
+      {view === 'generate' && <>
       <div className="outfit-controls">
         <label className="form-field">Ocasión
           <select value={occasion} onChange={(event) => setOccasion(event.target.value as OutfitTemplate)}>
@@ -183,6 +264,15 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
         <label className="form-field">Condiciones (opcional)
           <input value={conditions} onChange={(event) => setConditions(event.target.value)} placeholder="Solo si las conoces" />
         </label>
+        <label className="form-field">Ciudad para consultar el tiempo
+          <input value={weatherCity} onChange={(event) => setWeatherCity(event.target.value)} placeholder="p. ej. Castellón" />
+        </label>
+        <div className="weather-action">
+          <button className="button button-outline" type="button" onClick={() => void loadTomorrowWeather()} disabled={weatherLoading || !weatherCity.trim()}>
+            {weatherLoading ? 'Consultando…' : 'Usar tiempo de mañana'}
+          </button>
+          <span>Consulta opcional a Open-Meteo. Los datos se usan solo como contexto.</span>
+        </div>
       </div>
 
       <details className="garment-selection">
@@ -240,9 +330,11 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
       </div>
 
       {loading && <div className="loading-state" role="status">Combinando prendas disponibles…</div>}
-      {!loading && results.length > 0 && <div className="outfit-results">
+      {!loading && results.length > 0 && <div className="outfit-results outfit-swipe-list">
         {results.map((entry, index) => (
-          <article className="outfit-card" key={entry.outfit.id}>
+          <article className="outfit-card" key={entry.outfit.id}
+            onTouchStart={(event) => { touchStart.current = { x: event.touches[0]?.clientX ?? 0, y: event.touches[0]?.clientY ?? 0 } }}
+            onTouchEnd={(event) => finishSwipe(event, entry)}>
             <header><div><p className="eyebrow">RECOMENDACIÓN {index + 1}</p><h2>{occasion} · {entry.outfit.score}/100</h2></div></header>
             <div className="outfit-garments">
               {entry.candidate.garments.map((garment) => (
@@ -255,28 +347,56 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
               <button type="button" className="button button-outline" onClick={() => void recordFeedback('dislike', entry)}>No me gusta</button>
               <button type="button" className="button button-outline" onClick={() => void recordFeedback('saved', entry)}>Guardar</button>
               <button type="button" className="button button-dark" onClick={() => void recordFeedback('worn', entry)}>Lo he usado</button>
-              <button type="button" className="button button-outline" onClick={() => void recordFeedback('dislike', entry)}>Descartar</button>
+              <button type="button" className="button button-outline" onClick={() => void recordFeedback('dislike', entry)}>Descartar / deslizar a la izquierda</button>
             </div>
+            <p className="swipe-hint">En móvil, desliza a la derecha para valorar positivamente o a la izquierda para descartar. También puedes usar estos botones.</p>
           </article>
         ))}
       </div>}
-      {savedHistory.length > 0 && <section className="outfit-history" aria-labelledby="outfit-history-title">
-        <h2 id="outfit-history-title">Favoritos e historial local</h2>
-        <div className="outfit-results">
-          {savedHistory.map((outfit) => {
-            const outfitGarments = outfit.garmentIds
-              .map((id) => garments.find((garment) => garment.id === id))
-              .filter((garment): garment is Garment => Boolean(garment))
-            return <article className="outfit-card" key={outfit.id}>
-              <p className="eyebrow">{outfit.favorite ? 'GUARDADO' : 'HISTORIAL'} · {outfit.score}/100</p>
-              <h3>{outfit.occasion}</h3>
-              {outfitGarments.length === outfit.garmentIds.length
-                ? <div className="outfit-garments">{outfitGarments.map((garment) => <figure key={garment.id}><GarmentPhoto image={garment.thumbnail ?? garment.image} alt={garmentLabel(garment)} /><figcaption>{garmentLabel(garment)}</figcaption></figure>)}</div>
-                : <p>Algunas prendas de este outfit ya no están en el armario.</p>}
-              <p className="outfit-explanation">{outfit.wornAt ? 'Utilizado' : outfit.favorite ? 'Favorito' : 'Valoración registrada'} · {new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(new Date(outfit.wornAt ?? outfit.createdAt))}</p>
-            </article>
-          })}
+      </>}
+
+      {view === 'create' && <section className="manual-outfit" aria-labelledby="create-outfit-title">
+        <h2 id="create-outfit-title">Crear outfit con tus prendas</h2>
+        <label className="form-field">Nombre del outfit
+          <input value={manualName} onChange={(event) => setManualName(event.target.value)} placeholder="p. ej. Look para la oficina" />
+        </label>
+        <div className="manual-garment-list">
+          {garments.map((garment) => (
+            <label key={garment.id}>
+              <input type="checkbox" checked={manualIds.includes(garment.id)} onChange={(event) => setManualIds((current) => event.target.checked
+                ? [...current, garment.id]
+                : current.filter((id) => id !== garment.id))} />
+              <span>{garmentLabel(garment)}</span>
+            </label>
+          ))}
         </div>
+        <button className="button button-dark" type="button" onClick={() => void saveManualOutfit()} disabled={!garments.length}>Guardar outfit</button>
+      </section>}
+
+      {view === 'saved' && <section className="outfit-history" aria-labelledby="outfit-history-title">
+        <h2 id="outfit-history-title">Outfits guardados</h2>
+        {savedHistory.filter((outfit) => outfit.favorite || outfit.kind === 'manual').length === 0
+          ? <p className="outfit-notice">Todavía no hay outfits guardados. Guarda una recomendación o crea uno con tus prendas.</p>
+          : <div className="outfit-results">
+            {savedHistory.filter((outfit) => outfit.favorite || outfit.kind === 'manual').map((outfit) => {
+              const outfitGarments = outfit.garmentIds
+                .map((id) => garments.find((garment) => garment.id === id))
+                .filter((garment): garment is Garment => Boolean(garment))
+              return <article className="outfit-card" key={outfit.id}>
+                <p className="eyebrow">{outfit.kind === 'manual' ? 'CREADO POR TI' : 'GENERADO Y GUARDADO'} · {outfit.score}/100</p>
+                <h3>{outfit.name || outfit.occasion}</h3>
+                {outfitGarments.length === outfit.garmentIds.length
+                  ? <div className="outfit-garments">{outfitGarments.map((garment) => <figure key={garment.id}><GarmentPhoto image={garment.thumbnail ?? garment.image} alt={garmentLabel(garment)} /><figcaption>{garmentLabel(garment)}</figcaption></figure>)}</div>
+                  : <p>Algunas prendas de este outfit ya no están en el armario.</p>}
+                <p className="outfit-explanation">{outfit.wornAt ? 'Utilizado' : 'Guardado'} · {new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(new Date(outfit.wornAt ?? outfit.createdAt))}</p>
+              </article>
+            })}
+          </div>}
+      </section>}
+
+      {view === 'generate' && savedHistory.some((outfit) => outfit.wornAt && !outfit.favorite) && <section className="outfit-history" aria-labelledby="worn-history-title">
+        <h2 id="worn-history-title">Historial de uso</h2>
+        <p>Los outfits que marcaste como usados se guardan en este dispositivo.</p>
       </section>}
     </section>
   )

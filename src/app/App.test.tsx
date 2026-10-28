@@ -43,6 +43,19 @@ afterEach(async () => {
 })
 
 describe('wardrobe flow', () => {
+  it('keeps adding garments inside the wardrobe flow, not in bottom navigation', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const navigation = screen.getByRole('navigation', { name: 'Navegación principal' })
+    expect(navigation).toHaveTextContent('Armario')
+    expect(navigation).toHaveTextContent('Outfits')
+    expect(navigation).toHaveTextContent('Maleta')
+    expect(navigation).not.toHaveTextContent('Añadir')
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+    expect(screen.getByRole('heading', { name: /añadir prenda/i })).toBeInTheDocument()
+  })
+
   it('fills the optional garment name from the local analysis suggestion and saves it', async () => {
     vi.mocked(analyzeGarmentImage).mockResolvedValue({
       category: 'Parte superior',
@@ -198,6 +211,6 @@ describe('wardrobe flow', () => {
 
     await screen.findByRole('button', { name: 'Camisa' })
     await user.selectOptions(screen.getByLabelText('Filtrar por categoría'), 'Parte inferior')
-    expect(screen.getByText('No encontramos esa prenda.')).toBeInTheDocument()
+    expect(await screen.findByText('No encontramos esa prenda.')).toBeInTheDocument()
   })
 })
