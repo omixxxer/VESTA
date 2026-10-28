@@ -13,7 +13,7 @@ Objetivo: sustituir Wargon por un clasificador propio que use la taxonomía de l
 | Fase | Estado |
 |---|---|
 | 1. Taxonomía, preparación de datos y exportación desde la app | Hecha |
-| 2. Embeddings y entrenamiento de cabezas | Pendiente |
+| 2. Embeddings y entrenamiento de cabezas | Hecha |
 | 3. Evaluación por clase sobre fotos propias | Pendiente |
 | 4. ONNX, cuantización e integración en `clothingAnalyzer.ts` | Pendiente |
 
@@ -61,6 +61,25 @@ Cada línea de `manifest.jsonl`:
 ```
 
 Las imágenes se guardan como JPEG RGB de 512 px como máximo.
+
+## Entrenamiento
+
+Requisitos: un entorno con torch para CPU, recomendado fuera de OneDrive.
+
+```sh
+python -m venv %LOCALAPPDATA%\vesta-ml\venv
+%LOCALAPPDATA%\vesta-ml\venv\Scripts\activate
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -r requirements-train.txt
+python -m vesta_ml.embed     # embeddings DINOv2; reanudable
+python -m vesta_ml.train     # cabezas; guarda en models/<nombre>/
+```
+
+- **Preprocesado** ([`features.py`](vesta_ml/features.py)): la imagen entera se encaja en 224×224 sin recortar (letterbox bilineal, relleno con el color medio de ImageNet) y se normaliza con la media y desviación de ImageNet. La app tendrá que replicarlo igual.
+- **Embedding:** token CLS + media de los tokens de parche de la última capa (768 valores). Se guarda en float16 en `embeddings/dinov2-small-224/`; solo se calculan las imágenes nuevas.
+- **Cabezas** ([`train.py`](vesta_ml/train.py)): estandarización, una capa oculta compartida de 512 y una salida lineal por cabeza. Entropía cruzada con pesos por clase (frecuencia inversa suavizada) y pérdida enmascarada. Se detiene por la media de macro-F1 en val.
+- Los valores con menos de `--min-examples` (20) ejemplos de train se descartan y sus etiquetas cuentan como desconocidas. Las cabezas sin datos (de momento formalidad, temporadas y color) no se entrenan. Ambos casos quedan en `heads.json`.
+- `metrics.json` guarda, para val y test, exactitud, macro-F1, precisión/recall/F1 por clase, confusiones más frecuentes y el desglose por fuente. La fuente `clothing-dataset` (y en el futuro `vesta`) es la más parecida al uso real.
 
 ## Exportación desde la app
 
