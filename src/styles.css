@@ -54,6 +54,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   padding: 54px 40px calc(150px + env(safe-area-inset-bottom));
 }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 40px; }
+.page-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.export-note { margin: -24px 0 28px; color: var(--graphite); font-size: 12px; line-height: 1.6; }
 .eyebrow { margin: 0 0 12px; color: var(--graphite); font-size: 10px; font-weight: 700; letter-spacing: 1.45px; }
 h1, h2, p { margin-top: 0; }
 .page-heading h1, .form-screen h1, .feature-screen h1 {
@@ -265,6 +267,8 @@ h1, h2, p { margin-top: 0; }
   .page-heading { align-items: flex-start; flex-direction: column; gap: 17px; margin-bottom: 28px; }
   .page-heading h1, .form-screen h1, .feature-screen h1 { font-size: 43px; }
   .page-intro { max-width: 330px; font-size: 12px; }
+  .page-actions { justify-content: flex-start; }
+  .export-note { margin: -14px 0 20px; }
   .desktop-add { display: none; }
   .wardrobe-toolbar { align-items: flex-start; flex-direction: column; gap: 11px; padding: 11px 0; }
   .filters { width: 100%; justify-content: space-between; }

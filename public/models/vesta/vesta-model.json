@@ -1,0 +1,150 @@
+{
+  "format": "vesta-model",
+  "name": "heads-v4",
+  "taxonomyVersion": 4,
+  "preprocessing": {
+    "backbone": "facebook/dinov2-small",
+    "inputSize": 224,
+    "resize": "letterbox-bilinear",
+    "padColor": [
+      124,
+      116,
+      104
+    ],
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "features": "cls+mean-patch",
+    "featureDim": 768
+  },
+  "input": "pixel_values",
+  "heads": [
+    {
+      "name": "category",
+      "multiLabel": false,
+      "values": [
+        "top",
+        "bottom",
+        "one-piece",
+        "outerwear",
+        "footwear",
+        "accessory"
+      ]
+    },
+    {
+      "name": "subcategory",
+      "multiLabel": false,
+      "values": [
+        "camiseta",
+        "camiseta-manga-larga",
+        "camiseta-tirantes",
+        "polo",
+        "camisa",
+        "blusa",
+        "top",
+        "jersey",
+        "sudadera",
+        "sudadera-capucha",
+        "prenda-deportiva",
+        "pantalon",
+        "vaqueros",
+        "pantalon-corto",
+        "pantalon-chandal",
+        "leggings",
+        "falda",
+        "medias",
+        "vestido",
+        "mono",
+        "chaqueta",
+        "blazer",
+        "abrigo",
+        "plumifero",
+        "chubasquero",
+        "cardigan",
+        "chaleco",
+        "zapatillas",
+        "zapatos",
+        "botas",
+        "sandalias",
+        "chanclas",
+        "zuecos",
+        "tacones",
+        "gorro",
+        "bolso",
+        "cinturon",
+        "bufanda",
+        "gafas",
+        "corbata",
+        "reloj"
+      ]
+    },
+    {
+      "name": "sleeve",
+      "multiLabel": false,
+      "values": [
+        "sin-mangas",
+        "corta",
+        "tres-cuartos",
+        "larga"
+      ]
+    },
+    {
+      "name": "fit",
+      "multiLabel": false,
+      "values": [
+        "ajustado",
+        "recto",
+        "ancho",
+        "campana"
+      ]
+    },
+    {
+      "name": "pattern",
+      "multiLabel": false,
+      "values": [
+        "liso",
+        "rayas",
+        "cuadros",
+        "lunares",
+        "floral",
+        "animal",
+        "camuflaje",
+        "geometrico",
+        "grafico",
+        "otro"
+      ]
+    }
+  ],
+  "rules": {
+    "subcategoryWithinCategory": true,
+    "attributesApplyTo": {
+      "sleeve": {
+        "appliesTo": [
+          "top",
+          "one-piece",
+          "outerwear"
+        ]
+      },
+      "fit": {
+        "appliesTo": [
+          "bottom"
+        ],
+        "appliesToSubcategories": [
+          "pantalon",
+          "vaqueros",
+          "pantalon-chandal",
+          "leggings"
+        ]
+      }
+    }
+  },
+  "file": "model_quantized.onnx",
+  "bytes": 25603629
+}

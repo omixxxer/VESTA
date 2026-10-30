@@ -22,14 +22,18 @@ export interface GarmentAnalysis {
     category: GarmentCategory
     subcategory: string
     colors: string[]
+    pattern?: string
+    sleeve?: string
+    fit?: string
     alternatives?: Array<{
       category: GarmentCategory
       subcategory: string
       score: number
     }>
   }
-  confidenceByAttribute: Partial<Record<'category' | 'subcategory' | 'colors', number>>
-  sourcesByAttribute: Partial<Record<'category' | 'subcategory' | 'colors', 'wargon-vit' | 'clip-zero-shot' | 'local-pixels'>>
+  confidenceByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern', number>>
+  // wargon-vit and clip-zero-shot only appear in garments analysed by earlier versions of the app.
+  sourcesByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern', 'vesta-dinov2' | 'wargon-vit' | 'clip-zero-shot' | 'local-pixels'>>
   unknownAttributes: string[]
   correctedAttributes: string[]
 }

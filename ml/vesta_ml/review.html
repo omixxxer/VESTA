@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisión VESTA</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --surface: #ffffff; --text: #22211d; --muted: #6f6c64; --line: #e2dfd6;
+    --accent: #2f4a3a; --accent-soft: #e3ece5; --warn: #9a3b2e; --warn-soft: #f6e3df;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614; --surface: #20201d; --text: #ecebe6; --muted: #a29f96; --line: #34332e;
+      --accent: #9cc4a9; --accent-soft: #263a2d; --warn: #e59b8d; --warn-soft: #43261f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--line);
+           padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  h1 { font-size: 17px; margin: 0 8px 0 0; }
+  select, button { font: inherit; color: inherit; }
+  select { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 100%; }
+  .stats { color: var(--muted); }
+  .help { color: var(--muted); padding: 10px 16px 0; margin: 0; }
+  main { padding: 12px 16px 96px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .card { background: var(--surface); border: 2px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .card.changed { border-color: var(--accent); }
+  .card.rejected { border-color: var(--warn); opacity: .7; }
+  .card img { width: 100%; height: 220px; object-fit: contain; background: #fff; display: block; }
+  .meta { padding: 6px 10px 0; color: var(--muted); font-size: 12px; }
+  .choices { padding: 8px 10px 10px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 9px; cursor: pointer; font-size: 12px; }
+  .chip small { color: var(--muted); }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .chip.on small { color: inherit; opacity: .8; }
+  .chip.other { border-style: dashed; }
+  .chip.reject.on { background: var(--warn); border-color: var(--warn); }
+  footer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--line);
+           padding: 10px 16px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .primary { background: var(--accent); color: var(--bg); border: 0; border-radius: 10px; padding: 10px 18px; cursor: pointer; font-weight: 600; }
+  .primary:disabled { opacity: .5; cursor: default; }
+  .empty { grid-column: 1 / -1; color: var(--muted); text-align: center; padding: 48px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Revisión de subcategorías</h1>
+  <select id="group" aria-label="Grupo a revisar"></select>
+  <span class="stats" id="stats"></span>
+</header>
+<p class="help">Todas las imágenes de la página llevan marcada la subcategoría propuesta. Corrige solo las que estén mal:
+  elige otra, «Ninguna» si no encaja ninguna o «Descartar» si la imagen no sirve (recorte malo, otra categoría).
+  Después pulsa «Guardar página».</p>
+<main id="grid"></main>
+<footer>
+  <span class="stats" id="pageInfo"></span>
+  <button class="primary" id="save" disabled>Guardar página</button>
+</footer>
+<script>
+const grid = document.getElementById('grid')
+const groupSelect = document.getElementById('group')
+const saveButton = document.getElementById('save')
+let items = []
+let choices = new Map()
+
+async function getJson(url, options) {
+  const response = await fetch(url, options)
+  if (!response.ok) throw new Error((await response.json()).error || response.statusText)
+  return response.json()
+}
+
+async function loadSummary(keep) {
+  const summary = await getJson('/api/summary')
+  const previous = keep ? groupSelect.value : ''
+  groupSelect.innerHTML = ''
+  for (const group of summary.groups) {
+    const option = document.createElement('option')
+    option.value = `${group.category}|${group.value}`
+    option.textContent = `${group.categoryLabel} › ${group.label} — ${group.pending} por revisar, ${group.existing} ya etiquetadas`
+    groupSelect.append(option)
+  }
+  if (previous && [...groupSelect.options].some((option) => option.value === previous)) groupSelect.value = previous
+  const labeled = summary.reviewed.labeled || 0
+  document.getElementById('stats').textContent =
+    `${summary.pending} pendientes · ${labeled} etiquetadas · ${summary.reviewed.unknown || 0} sin encaje · ${summary.reviewed.rejected || 0} descartadas`
+  await loadItems()
+}
+
+async function loadItems() {
+  grid.innerHTML = ''
+  choices = new Map()
+  if (!groupSelect.value) {
+    grid.innerHTML = '<p class="empty">No quedan propuestas pendientes.</p>'
+    saveButton.disabled = true
+    return
+  }
+  const [category, value] = groupSelect.value.split('|')
+  items = await getJson(`/api/items?category=${category}&value=${value}&limit=24`)
+  for (const item of items) {
+    choices.set(item.id, { status: 'labeled', subcategory: item.candidates[0].value })
+    grid.append(card(item))
+  }
+  document.getElementById('pageInfo').textContent = `${items.length} imágenes en esta página`
+  saveButton.disabled = items.length === 0
+  window.scrollTo(0, 0)
+}
+
+function card(item) {
+  const element = document.createElement('article')
+  element.className = 'card'
+  const image = document.createElement('img')
+  image.src = item.image
+  image.alt = ''
+  image.loading = 'lazy'
+  const meta = document.createElement('div')
+  meta.className = 'meta'
+  meta.textContent = item.source
+  const row = document.createElement('div')
+  row.className = 'choices'
+  const options = [
+    ...item.candidates.map((candidate) => ({ key: candidate.value, text: candidate.label, p: candidate.p,
+      choice: { status: 'labeled', subcategory: candidate.value } })),
+    { key: 'unknown', text: 'Ninguna', className: 'other', choice: { status: 'unknown' } },
+    { key: 'rejected', text: 'Descartar', className: 'other reject', choice: { status: 'rejected' } }
+  ]
+  const proposed = item.candidates[0].value
+  const render = () => {
+    const current = choices.get(item.id)
+    const key = current.status === 'labeled' ? current.subcategory : current.status
+    for (const button of row.querySelectorAll('button')) button.classList.toggle('on', button.dataset.key === key)
+    const menu = row.querySelector('select')
+    if (menu) {
+      menu.value = [...menu.options].some((option) => option.value === key) ? key : ''
+      menu.classList.toggle('on', menu.value !== '')
+    }
+    element.classList.toggle('changed', key !== proposed && key !== 'rejected')
+    element.classList.toggle('rejected', key === 'rejected')
+  }
+  // Likely options as chips; the rest in a menu to keep cards compact.
+  const visible = options.filter((option, index) => option.p === undefined || index < 3 || option.p >= 0.05)
+  const hidden = options.filter((option) => !visible.includes(option))
+  for (const option of visible) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = `chip ${option.className || ''}`
+    button.dataset.key = option.key
+    button.innerHTML = option.p === undefined ? option.text : `${option.text} <small>${Math.round(option.p * 100)}%</small>`
+    button.addEventListener('click', () => { choices.set(item.id, option.choice); render() })
+    row.append(button)
+  }
+  if (hidden.length) {
+    const menu = document.createElement('select')
+    menu.className = 'chip'
+    menu.setAttribute('aria-label', 'Otra subcategoría')
+    menu.innerHTML = '<option value="">Otra…</option>' + hidden.map((option) => `<option value="${option.key}">${option.text}</option>`).join('')
+    menu.addEventListener('change', () => {
+      const option = hidden.find((entry) => entry.key === menu.value)
+      if (option) { choices.set(item.id, option.choice); render() }
+    })
+    row.append(menu)
+  }
+  element.append(image, meta, row)
+  render()
+  return element
+}
+
+saveButton.addEventListener('click', async () => {
+  saveButton.disabled = true
+  try {
+    const decisions = [...choices].map(([id, choice]) => ({ id, ...choice }))
+    await getJson('/api/decisions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(decisions) })
+    await loadSummary(true)
+  } catch (error) {
+    alert(`No se pudo guardar: ${error.message}`)
+    saveButton.disabled = false
+  }
+})
+groupSelect.addEventListener('change', loadItems)
+loadSummary(false)
+</script>
+</body>
+</html>

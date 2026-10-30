@@ -132,11 +132,13 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
                   <dt>Procedencia del análisis</dt>
                   <dd>
                     Sugerencias locales de {garment.analysis.modelId} ({garment.analysis.modelVersion.slice(0, 8)}).
-                    {' '}Categoría: {garment.analysis.sourcesByAttribute.category === 'clip-zero-shot'
-                      ? 'CLIP zero-shot'
-                      : garment.analysis.sourcesByAttribute.category === 'wargon-vit'
-                        ? 'clasificación ViT de 27 clases'
-                        : 'clasificador de imágenes'}; color: muestreo de píxeles.
+                    {' '}Categoría: {garment.analysis.sourcesByAttribute.category === 'vesta-dinov2'
+                      ? 'modelo propio de VESTA (DINOv2)'
+                      : garment.analysis.sourcesByAttribute.category === 'clip-zero-shot'
+                        ? 'CLIP zero-shot'
+                        : garment.analysis.sourcesByAttribute.category === 'wargon-vit'
+                          ? 'clasificación ViT de 27 clases'
+                          : 'clasificador de imágenes'}; color: muestreo de píxeles.
                     {' '}Puntuación no calibrada de categoría: {((garment.analysis.confidenceByAttribute.category ?? 0) * 100).toFixed(1)}%;
                     {' '}predominio heurístico del color: {((garment.analysis.confidenceByAttribute.colors ?? 0) * 100).toFixed(1)}%.
                     {' '}Atributos corregidos: {garment.analysis.correctedAttributes.join(', ') || 'ninguno registrado'}.
