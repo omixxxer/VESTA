@@ -6,7 +6,7 @@ Objetivo: sustituir Wargon por un clasificador propio que use la taxonomía de l
 
 - **Backbone:** DINOv2 ViT-S/14 (Apache-2.0) congelado. Los embeddings se calculan una vez y se reutilizan, lo que permite entrenar en CPU.
 - **Cabezas:** `category`, `subcategory`, `sleeve`, `fit` (corte del pantalón), `pattern`, `formality`, `seasons` (multietiqueta) y `colors` (multietiqueta). Cada imagen entrena solo las cabezas que tiene etiquetadas (pérdida enmascarada); `null` significa «desconocido», no «ninguno».
-- **Exportación:** un único ONNX (backbone + cabezas) cuantizado int8 para Transformers.js/ONNX Runtime Web.
+- **Exportación:** un único ONNX (backbone + cabezas) cuantizado int8 para ONNX Runtime Web.
 
 ## Estado
 

@@ -1,0 +1,37 @@
+VESTA
+Copyright (c) 2026 Ximo Martínez. Todos los derechos reservados.
+
+Este repositorio y todo su contenido propio (código fuente, scripts de
+entrenamiento, taxonomía, reglas, pesos de las cabezas entrenadas, diseño,
+textos e iconos) son propiedad exclusiva de Ximo Martínez.
+
+Que el código se pueda consultar públicamente no concede ninguna licencia.
+Sin permiso previo y por escrito del titular, no se permite usar, copiar,
+modificar, fusionar, publicar, distribuir, sublicenciar, vender, ofrecer como
+servicio ni crear obras derivadas de este contenido, ni total ni parcialmente,
+ni utilizarlo para entrenar o evaluar modelos de inteligencia artificial.
+
+Los componentes de terceros incluidos o utilizados (bibliotecas, modelos
+preentrenados y datos de entrenamiento) no están cubiertos por esta licencia
+y se rigen por sus propias licencias, que se enumeran en
+THIRD_PARTY_NOTICES.md. Nada de lo anterior limita los derechos que esas
+licencias conceden sobre dichos componentes.
+
+EL CONTENIDO SE PROPORCIONA «TAL CUAL», SIN GARANTÍA DE NINGÚN TIPO, EXPRESA
+O IMPLÍCITA. EN NINGÚN CASO EL TITULAR SERÁ RESPONSABLE DE DAÑOS O PÉRDIDAS
+DERIVADOS DEL USO DEL CONTENIDO.
+
+Para solicitar permisos o una licencia, contacta con el titular a través de
+GitHub: https://github.com/omixxxer
+
+---
+
+English summary (the Spanish text above prevails):
+
+Copyright (c) 2026 Ximo Martínez. All rights reserved. Public visibility of
+this repository grants no license. No use, copying, modification,
+distribution, sublicensing, sale, hosting as a service, creation of
+derivative works or use for training or evaluating AI models is permitted
+without prior written permission from the copyright holder. Third-party
+components keep their own licenses, listed in THIRD_PARTY_NOTICES.md. The
+content is provided "as is", without warranty of any kind.

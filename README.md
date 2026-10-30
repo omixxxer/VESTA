@@ -1,127 +1,136 @@
 # VESTA — Armario virtual
 
-Armario virtual local-first para catalogar prendas, generar y guardar outfits, y preparar una propuesta de maleta a partir del inventario propio. No requiere cuenta ni backend. Las prendas, outfits y fotografías se guardan en IndexedDB en el navegador.
+Armario virtual *local-first*: catalogas tus prendas con una foto, generas outfits según la ocasión y el tiempo, y preparas la maleta de un viaje. No hay cuenta, servidor ni analítica: prendas, fotos y outfits se guardan en el navegador (IndexedDB), y el análisis de las fotos se hace en el propio dispositivo con un modelo de IA propio.
 
-## Requisitos
+> **Licencia:** software propietario, todos los derechos reservados. Ver [LICENSE](LICENSE) y [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-- Node.js 20.19+ o 22.12+
-- npm
+## Funcionalidades
 
-## Instalación y desarrollo
+### Armario
+- Galería tipo *masonry* con búsqueda (nombre, código, categoría, color…) y filtro por categoría; carga 40 prendas por tanda.
+- Hasta 4 fotos por prenda (JPG, PNG o WebP de hasta 8 MB), con portada elegible y miniaturas locales de 640 px como máximo.
+- **Código único por prenda** según su tipo, como `SDC-002` (sudadera con capucha nº 2) o `VAQ-001`, para distinguir prendas parecidas. No cambia al editar la prenda y no se reutiliza al borrarla.
+- Detalle de cada prenda con sus fotos, la foto de la etiqueta, los atributos y la procedencia del análisis; edición y borrado.
+
+### Catalogación automática
+Al añadir o cambiar fotos, la app propone los campos y marca cada uno como **Sugerido** hasta que lo revisas:
+- **Categoría, subcategoría y estampado** con el modelo propio de VESTA, combinando todas las fotos de la prenda, más tres alternativas para elegir con un toque. Informa también de la manga y del corte del pantalón.
+- **Confianza calibrada:** un 80 % acierta aproximadamente 8 de cada 10 veces.
+- **Color** por análisis de píxeles (hasta tres colores).
+- **Marca** si aparece escrita en la prenda (lengüeta, talón, pecho).
+- **Foto de la etiqueta** en un campo propio: de ella se leen marca, talla y composición. Solo pasa por el lector de texto, así que no altera la clasificación de la prenda.
+- **Temporadas, estilo y estética** sugeridos por reglas según el tipo de prenda, la manga y la composición.
+- **Nombre** propuesto con subcategoría, colores y marca (p. ej. «Camiseta blanca · Zara»).
+
+El **estilo** es el nivel de vestir en cuatro niveles (Deportivo, Diario, Arreglado y Formal), y cada prenda marca todos los que le encajan: una camisa blanca vale de Diario a Formal y unos vaqueros, de Diario a Arreglado. La **estética** (Minimalista, Clásico, Urbano, Vintage…) es libre y opcional.
+
+### Outfits
+- Generador con prendas reales, que puntúa cada combinación según la ocasión (Diario, Arreglado, Formal, Deportivo, Frío y capas, Calor y pocas capas), el tiempo, los colores y estampados, tus preferencias, el feedback y la rotación.
+- Tiempo de mañana opcional desde Open-Meteo por ciudad.
+- Valoración con botones o deslizando en el móvil, favoritos, historial de «usado» y outfits creados a mano.
+- Prendas marcadas como no disponibles (por ejemplo, en la lavadora) excluidas de las propuestas.
+- Preferencias de colores, estéticas y estilo.
+
+### Maleta
+- Plan de hasta 14 días para una ciudad y una fecha: un outfit por día según la previsión y una lista de equipaje única y editable. Los planes aún no se guardan.
+
+### Datos para entrenar el modelo
+- El botón **Exportar datos de entrenamiento** genera en el navegador un ZIP con las fotos y sus etiquetas normalizadas, sin nombre, marca, talla, notas ni foto de la etiqueta.
+
+## Privacidad
+
+- Prendas, fotos, outfits y preferencias se guardan solo en IndexedDB, en tu navegador. No hay backend, inicio de sesión ni analítica.
+- Los modelos (clasificador y lector de texto) se sirven desde el propio origen y se ejecutan en el dispositivo con WebAssembly: **las fotos y las predicciones no salen del navegador**.
+- La única conexión externa es Open-Meteo, cuando consultas el tiempo: recibe el nombre de la ciudad y sus coordenadas, nunca el inventario ni las fotos.
+- La política CSP solo permite conexiones al propio origen y a Open-Meteo.
+- La PWA precachea la interfaz, pero no los modelos ni los datos personales. Los modelos se guardan en Cache Storage tras la primera descarga, para funcionar sin conexión.
+
+Esto describe el diseño del código; no es una auditoría de tráfico.
+
+**Pérdida de datos:** limpiar los datos del sitio, usar otro navegador o perfil, o la purga automática de algunos navegadores (Safari) borra o separa el armario. IndexedDB no cifra los datos. Todavía no hay copia de seguridad ni exportación completa del armario (está en la hoja de ruta).
+
+## Puesta en marcha
+
+Requisitos: Node.js 20.19+ o 22.12+, y npm.
 
 ```sh
 npm install
-npm run dev
+npm run dev        # servidor de desarrollo
+npm test           # pruebas (Vitest, jsdom, fake-indexeddb)
+npm run build      # comprobación de TypeScript y compilación con Vite
+npm run preview    # previsualizar la compilación
 ```
 
-Vite muestra la dirección local al iniciar. Para generar y previsualizar una compilación:
+## Arquitectura
 
-```sh
-npm run build
-npm run preview
-```
+React 19, TypeScript y Vite; Dexie sobre IndexedDB; PWA con `vite-plugin-pwa`; inferencia con `onnxruntime-web` (WebAssembly). La interfaz usa componentes de React Bits (Masonry, Pill Nav y el fondo Pattern Waves con OGL, que se detiene si el sistema prefiere movimiento reducido) e iconos de Hugeicons.
 
-Para ejecutar las pruebas:
+| Carpeta | Contenido |
+|---|---|
+| `src/app/` | Pantallas, navegación y estado |
+| `src/components/` | Formulario y detalle de prenda, galería, generador de outfits, maleta |
+| `src/ai/` | Clasificador ONNX, lector de texto (OCR), marcas, talla y composición, reglas de uso, color |
+| `src/db/` | Base de datos Dexie, repositorio de prendas, códigos y miniaturas |
+| `src/outfits/` | Generación y puntuación de outfits |
+| `src/weather/` | Cliente de Open-Meteo |
+| `src/ml/` | Taxonomía compartida con el entrenamiento y exportación de datos |
+| `ml/` | Entrenamiento, evaluación y exportación del modelo propio (Python) |
+| `public/models/` | Modelos ONNX del clasificador y del OCR, con sus avisos de licencia |
 
-```sh
-npm test
-```
+### Base de datos
 
-## Funcionalidad disponible
-
-- Fondo animado Pattern Waves, con animación desactivada si el sistema prefiere movimiento reducido.
-- Catálogo Masonry con búsqueda, filtro, consulta, edición y eliminación de prendas. La galería muestra 40 prendas por tanda y permite cargar más.
-- Cada prenda recibe al crearse un código corto y único por tipo, como `SDC-002` (sudadera con capucha nº 2) o `VAQ-001`, para distinguir prendas parecidas. El prefijo sale de la subcategoría (`code` en `ml/taxonomy.json`; si no se reconoce, de la categoría), no cambia al editar la prenda y no se reutiliza tras borrarla. Se muestra en la galería y en el detalle, y se puede buscar.
-- Pill Nav fijo en la parte inferior: Armario, Outfits y Maleta. La acción para añadir prendas está integrada en Armario.
-- Outfits generados con prendas reales, preferencias y feedback; se pueden valorar con botones o swipe en móvil, guardar como favoritos y consultar después. También se pueden crear outfits manuales.
-- Consulta opcional a Open-Meteo para usar el tiempo de mañana en el generador y planificar una maleta para una ciudad, fecha y duración de hasta 14 días. Los outfits diarios y una lista de prendas única se proponen localmente; la lista puede editarse.
-- Las fotos originales y la miniatura de portada se procesan localmente y se almacenan en IndexedDB. Se pueden guardar hasta cuatro fotos por prenda; las miniaturas no exceden 640 px por lado.
-- Catalogación visual automática al añadir o cambiar fotos, tanto al crear una prenda como al editarla. El modelo propio de VESTA combina las probabilidades de todas las fotos para proponer categoría, subcategoría y estampado, lee la marca si aparece escrita en la foto, mostrar tres alternativas e informar de la manga o el corte del pantalón. El nombre se propone con subcategoría, hasta dos colores y marca (por ejemplo, «Camiseta blanca · Zara»), y se actualiza con esos campos mientras no se edite manualmente. El color se estima aparte con píxeles locales. El usuario puede elegir una alternativa, revisar y corregir los campos antes de guardar.
-- IndexedDB versionada con tablas para prendas, outfits, preferencias y paquetes de tendencias.
-- La PWA precachea recursos estáticos; no cachea solicitudes API ni datos personales. La consulta meteorológica envía el nombre de la ciudad a Open-Meteo y no envía el inventario ni las fotografías.
-
-La interfaz usa los componentes React Bits instalados desde su registro. Masonry requiere React/React DOM 19 y Hugeicons; Pattern Waves usa OGL. Pill Nav no necesita GSAP ni otra librería de animación. El analizador utiliza `onnxruntime-web` (WebAssembly) para la inferencia ONNX en el navegador.
-
-## Arquitectura y bases de datos
-
-- `src/app/`: composición de pantallas, navegación y estado de la aplicación.
-- `src/components/`: formularios, detalle de prendas, galería, generador de outfits y planificador de maleta.
-- `src/db/`: base IndexedDB versionada con Dexie y procesamiento de miniaturas.
-- `src/ai/`: clasificación local ONNX y estimación heurística de color.
-- `src/outfits/`: generación determinista de combinaciones y puntuación heurística.
-- `src/weather/`: cliente de geocodificación y previsión diaria de Open-Meteo.
-- `src/types/`: tipos compartidos del dominio.
-
-La base local se llama `vesta-wardrobe`. El esquema actual es la versión 5:
+La base local se llama `vesta-wardrobe` y está en la versión 6:
 
 | Almacén | Índices | Contenido |
 |---|---|---|
-| `garments` | `id`, `category`, `name`, `updatedAt`, `&code` | Prendas, atributos e imágenes originales, adicionales y miniaturas como `Blob`. `code` es un código legible y único (p. ej. `SDC-002`). |
-| `garmentCodeCounters` | `prefix` | Último número dado a cada prefijo de código, para no reutilizar el código de una prenda borrada. |
-| `outfits` | `id`, `createdAt`, `favorite`, `kind` | Outfits manuales y generados guardados, referencias a prendas e historial de uso. |
-| `preferences` | `id` | Preferencias locales del generador. |
-| `trendPacks` | `id`, `version`, `publishedAt` | Estructura preparada para paquetes de tendencias; la pantalla de tendencias aún no está implementada. |
-| `outfitFeedback` | `id`, `type`, `createdAt` | Valoraciones y selecciones que alimentan futuras puntuaciones. |
+| `garments` | `id`, `category`, `name`, `updatedAt`, `&code` | Prendas con atributos, código, fotos, foto de la etiqueta y miniatura (`Blob`) |
+| `garmentCodeCounters` | `prefix` | Último número dado a cada prefijo de código |
+| `outfits` | `id`, `createdAt`, `favorite`, `kind` | Outfits generados y manuales guardados, con historial de uso |
+| `preferences` | `id` | Preferencias del generador |
+| `outfitFeedback` | `id`, `type`, `createdAt` | Valoraciones que ajustan las puntuaciones |
+| `trendPacks` | `id`, `version`, `publishedAt` | Reservado para tendencias (sin pantalla todavía) |
 
-Las migraciones preservan los datos existentes: v2 añade dimensiones ausentes a prendas antiguas; v3 incorpora feedback de outfits; v4 añade el índice `kind` para distinguir outfits manuales y generados; v5 añade el código de prenda (único) y sus contadores, y da código a las prendas existentes por orden de alta. No se separan aún las imágenes del registro de prenda, por lo que la lectura inicial sigue recuperando los `Blob` aunque la galería limite cuántas miniaturas muestra.
+Las migraciones conservan los datos: v2 añade dimensiones a prendas antiguas; v3, el feedback; v4, el tipo de outfit; v5, los códigos de prenda (asignados por fecha de alta) y sus contadores; v6 convierte la formalidad anterior en niveles de estilo (Casual → Diario, Smart casual → Arreglado, Formal → Formal), también en las preferencias y en los outfits guardados. Las imágenes aún van dentro del registro de cada prenda, así que leer el armario carga todos los `Blob`.
 
-`npm run build` ejecuta primero la comprobación de TypeScript y después Vite. `npm test` ejecuta Vitest en jsdom con IndexedDB simulado mediante `fake-indexeddb`. La PWA precachea recursos de interfaz y usa caché de tiempo de ejecución para los módulos WebAssembly; no precachea el modelo de ropa ni las respuestas meteorológicas.
+## Modelos de IA
 
-## Catalogación local y evaluación de modelos
+### Clasificador de prendas
+- **Modelo:** propio de VESTA, entrenado en [`ml/`](ml/README.md). Es DINOv2 ViT-S/14 (Meta, Apache-2.0) congelado, más cabezas de categoría, subcategoría, manga, corte de pantalón y estampado, con la taxonomía de la app ([`ml/taxonomy.json`](ml/taxonomy.json)).
+- **Datos:** solo con licencia que permite uso comercial (Clothing Dataset, Fashionpedia, Open Images, Unsplash, Pexels y fotos propias).
+- **Formato:** un único ONNX int8 de ~25,6 MB en `public/models/vesta/`, con `vesta-model.json` (salidas, preprocesado, reglas y temperaturas de calibración).
+- **Cómo combina las fotos:** promedia las probabilidades de todas las fotos, elige la categoría y busca la subcategoría solo dentro de ella; las alternativas se ordenan por P(categoría) × P(subcategoría | categoría). La app rechaza un modelo exportado con otra versión de taxonomía.
+- **Calidad** (heads-v4, test de 2.987 imágenes de las fuentes de entrenamiento): categoría 92,8 %, subcategoría 80,3 % (macro-F1 0,73), manga 88,1 %, estampado 85,3 %, corte 63,4 %. El detalle por clase está en [`ml/README.md`](ml/README.md).
+- **Velocidad** en el equipo de desarrollo: la primera foto tarda ~10 s (descarga y carga del modelo); las siguientes, 0,6–1 s. No se ha medido en móviles.
 
-El modelo integrado es el propio de VESTA, entrenado en [`ml/`](ml/README.md): DINOv2 ViT-S/14 (Apache-2.0) congelado más cabezas de categoría, subcategoría, manga, corte de pantalón y estampado, con la taxonomía de la app (incluidos calzado y accesorios). Se exporta con `python -m vesta_ml.export` a un único ONNX cuantizado int8 de ~25,6 MB en `public/models/vesta/model_quantized.onnx`, junto a `vesta-model.json`, que describe salidas, preprocesado y reglas, y `NOTICE.md` con licencias y fuentes. Se carga bajo demanda con ONNX Runtime Web (WebAssembly), no durante el precache PWA, y se guarda en Cache Storage para funcionar sin conexión después de la primera descarga. El preprocesado replica el de entrenamiento: la imagen entera encajada en 224×224 sobre el color medio (letterbox) y normalización ImageNet.
+### Lector de texto (OCR)
+- **Modelos:** PaddleOCR PP-OCRv5 mobile (Apache-2.0), con un detector de 4,8 MB y un reconocedor de alfabeto latino de 8 MB, en `public/models/ocr/`. Tarda 1–2 s por foto, en paralelo con el clasificador.
+- **Marca:** [`src/ai/brands.ts`](src/ai/brands.ts) compara el texto con ~95 marcas. Admite letras separadas (N I K E) y una letra mal leída en nombres largos; los logos sin letras no se reconocen.
+- **Talla y composición:** [`src/ai/labelParser.ts`](src/ai/labelParser.ts) extrae la talla en letras (XS–4XL), en número europeo (EUR 42, T. 38) o de vaquero (W32 L34), y elige según la categoría: número en calzado, letra en prendas superiores. También extrae la composición en varios idiomas, traducida al español («95 % algodón, 5 % elastano»). Las tallas US/UK no se convierten.
+- **Requisito:** necesita una foto cercana, recta y con buena luz; si no, el campo se deja vacío.
 
-El analizador promedia las probabilidades de todas las fotos de la prenda, elige la categoría y busca la subcategoría solo entre las de esa categoría; las alternativas se ordenan por P(categoría) × P(subcategoría | categoría). Rellena categoría, subcategoría y estampado, y muestra como información la manga (prendas superiores, vestidos y abrigos) y el corte (pantalones, vaqueros, chándal y leggings), que la prenda no guarda como campos. Las reglas salen de `ml/taxonomy.json`, las mismas que usa el entrenamiento; la app rechaza un modelo exportado con otra versión de taxonomía. Las confianzas están calibradas con *temperature scaling* (una temperatura por cabeza ajustada en validación y guardada en `vesta-model.json`), de modo que un 80 % acierta aproximadamente 8 de cada 10 veces; siguen siendo sugerencias editables. Un modelo exportado sin temperaturas se muestra como «no calibrado». El color no lo predice el modelo: sale del muestreo de píxeles. Temporadas, estilo y estética tampoco: los sugieren reglas sencillas de [`usageRules.ts`](src/ai/usageRules.ts) a partir de la subcategoría, la manga y la composición (plumífero → otoño e invierno, manga corta → primavera y verano, lana → no verano, camisa → diario a formal, blazer → arreglado y formal y estética clásica, sudadera → urbana…). En una prenda nueva siguen al tipo mientras el usuario no los cambie; una prenda guardada conserva los suyos.
+### Reglas sin modelo
+- **Color:** muestrea los píxeles del centro de cada foto, descuenta el color de fondo dominante en el borde y nombra el color más frecuente. Es una heurística, no segmentación: los fondos complejos, las sombras y las prendas de varios colores la confunden.
+- **Uso:** [`src/ai/usageRules.ts`](src/ai/usageRules.ts) sugiere temporadas, estilo y estética según el tipo de prenda (plumífero → otoño e invierno; manga corta → primavera y verano; lana → sin verano; blazer → Arreglado y Formal…).
 
-El **estilo** es el nivel de vestir, en cuatro niveles (Deportivo, Diario, Arreglado, Formal), y cada prenda marca todos los que le encajan: una camisa blanca vale de Diario a Formal y unos vaqueros de Diario a Arreglado. La **estética** (Minimalista, Clásico, Urbano, Vintage…) es libre y opcional. La versión 6 de la base de datos convirtió la formalidad anterior (Casual → Diario, Smart casual → Arreglado, Formal → Formal), también en la preferencia del generador y en el nombre de los outfits guardados. El generador de outfits usa la temporada según la temperatura, el estilo según la ocasión (100 si la prenda llega a ese nivel, 62 a un paso, 35 más lejos; la ocasión «Formal» descarta prendas que no lleguen a Formal, salvo las que no tienen estilo) y la estética según las preferencias. En la exportación de entrenamiento el estilo va en la cabeza `formality` de la taxonomía, ahora multietiqueta; las exportaciones antiguas se convierten con sinónimos (casual → diario, smart casual → arreglado). Esa cabeza no está en ningún modelo entrenado, así que el modelo actual sigue siendo compatible.
+### Límites conocidos
+- El test procede de las mismas fuentes que el entrenamiento; con fotos propias solo hay 29 de referencia.
+- Una prenda por foto: varias prendas, oclusiones o fondos complejos pueden fallar.
+- El corte de pantalón «campana» aún no se aprende.
+- Faltan pruebas con etiquetas reales y en móviles.
 
-**Marca leída en la foto:** junto al clasificador, un lector de texto en el dispositivo (PaddleOCR PP-OCRv5 mobile, Apache-2.0: detector de 4,8 MB y reconocedor de alfabeto latino de 8 MB en `public/models/ocr/`, con su `NOTICE.md`) lee el texto visible de cada foto, y [`src/ai/brands.ts`](src/ai/brands.ts) lo compara con una lista de ~95 marcas habituales y sus variantes: admite letras separadas (N I K E) y una letra mal leída en nombres de cinco o más letras, y exige que las marcas que también son palabras comunes o muy cortas (Mango, Gap, Boss…) sean la línea entera. La marca solo rellena el campo si estaba vacío. Funciona cuando la marca está escrita (lengüeta, talón, pecho, etiqueta interior); los logos sin letras, como el swoosh de Nike, no se reconocen. Si el lector falla, el resto de la sugerencia se mantiene. Con las fotos de prueba el OCR tarda 1–2 s por foto en este equipo, en paralelo con el clasificador. No se usan datasets de marcas o modelos de zapatillas: los disponibles proceden de imágenes de buscadores o de catálogos sin licencia comercial.
+## Hoja de ruta
 
-**Talla y composición de la etiqueta:** del mismo texto, [`src/ai/labelParser.ts`](src/ai/labelParser.ts) extrae la talla y la composición. Talla: letras (XS–4XL) solas en su línea o junto a una palabra de talla (Talla, Size, Taille, T.…); números solo con un sistema europeo o una palabra de talla al lado (EUR 42, T. 38), para no confundirlos con referencias o porcentajes; vaqueros W32 L34. El calzado usa el número, la parte inferior prefiere vaqueros/número y el resto la letra; las tallas US/UK/MEX no se convierten. Composición: porcentajes junto a fibras conocidas en varios idiomas, traducidas al español («95 % algodón, 5 % elastano»), sin repetir la misma fibra en otro idioma y parando al llegar al 100 %, para no mezclar el forro. La prenda tiene un campo opcional «Composición» (sin migración: es un campo nuevo opcional). La etiqueta tiene su propio campo de foto (`labelImage` en la prenda): esa foto solo pasa por el lector de texto, nunca por el clasificador, así que no influye en la categoría, la subcategoría ni el color que se combinan de las fotos de la prenda, y cambiarla no vuelve a clasificar la prenda. La talla se elige según la categoría actual (número en calzado, letra en prendas superiores) y se recalcula si la categoría cambia, salvo que la hayas escrito tú. La foto de la etiqueta se guarda con la prenda y se ve en su detalle, pero no se incluye en la exportación de datos de entrenamiento. Necesita una foto cercana y recta; con letra pequeña o torcida la composición puede no leerse, y entonces no se propone.
+- [ ] Exportar e importar el armario completo (JSON + imágenes), como copia de seguridad y para cambiar de dispositivo.
+- [ ] Segmentación: añadir prendas desde una foto de cuerpo entero y guardar también el look; quitar el fondo de las fotos (con modelos de licencia comercial).
+- [ ] «Me lo pongo hoy» con calendario, y estadísticas (coste por uso, prendas olvidadas, colores, marcas).
+- [ ] Separar metadatos e imágenes en IndexedDB y cargar miniaturas bajo demanda.
+- [ ] Copia de seguridad opcional en el Google Drive del propio usuario.
+- [ ] Capa opcional de lenguaje natural para explicar y ordenar outfits, enviando solo texto.
+- [ ] Guardar los planes de viaje.
+- [ ] Tendencias, con una fuente fiable y fechada.
+- [ ] Dividir el bloque principal de JavaScript (533 kB, que supera el aviso de 500 kB de Vite).
+- [ ] Probar la usabilidad en móvil y escritorio, y validar el generador con armarios grandes e incompletos.
 
-**Calidad (heads-v4, test de 2.987 imágenes de las fuentes de entrenamiento):** categoría 92,8 %, subcategoría 80,3 % (macro-F1 0,73), manga 88,1 %, estampado 85,3 %, corte 63,4 %. La cuantización int8 pierde como mucho ~1,5 puntos frente a fp32. El detalle por clase y las clases flojas están en [`ml/README.md`](ml/README.md). Con las cuatro fotos de `public/test-photos`, en el navegador: camiseta blanca → Camiseta, chaqueta azul → Chaqueta, chaqueta verde → Chaqueta, sudadera verde → Sudadera con capucha (Wargon, el modelo anterior, confundía la chaqueta verde con una sudadera). La primera foto tardó ~9,6 s, incluida la descarga y la carga del modelo; las siguientes, 0,6–1 s cada una en este equipo. No se ha medido en móviles.
+## Licencia
 
-La aplicación sirve el ONNX desde su propio origen. Las imágenes se decodifican y procesan localmente: no se envían las fotos, las predicciones ni el inventario.
-
-El formulario acepta hasta cuatro fotos JPG, PNG o WebP, de hasta 8 MB cada una. Se guardan con la prenda y se pueden consultar desde su detalle; la primera es la portada y se puede cambiar al editar. Son vistas de una misma prenda: varias fotos pueden mejorar la evidencia visual, pero no añaden capacidades nuevas de detección. La estimación de color muestrea píxeles locales de cada foto, reduce bordes y descuenta el color de fondo más común en el perímetro; propone hasta tres colores por frecuencia. Es una heurística, no segmentación de prendas; fondos complejos pueden alterarla. Las correcciones y el identificador/versión del modelo, puntuaciones, sugerencias y atributos no detectados se guardan junto con la prenda en IndexedDB. Las prendas analizadas con versiones anteriores (Wargon, CLIP) conservan su procedencia.
-
-**Límites:** el test procede de las mismas fuentes que el entrenamiento (sobre todo recortes de personas de Fashionpedia y fotos de producto); con fotos propias solo hay 29 de referencia. Solo se predice una prenda por imagen; prendas múltiples, oclusiones y fondos complejos pueden fallar. La siguiente validación debe ampliar el conjunto de fotos propias y medir rendimiento y memoria en móviles.
-
-## Modelo propio
-
-[`ml/`](ml/README.md) contiene todo el proceso del modelo: taxonomía compartida con la app ([`ml/taxonomy.json`](ml/taxonomy.json)), preparación de datos con licencia comercial (Clothing Dataset, Fashionpedia, Open Images, Unsplash/Pexels y fotos propias), revisión de etiquetas, entrenamiento, evaluación y exportación. El botón **Exportar datos de entrenamiento** del Armario genera en el navegador un ZIP con las fotos y sus etiquetas normalizadas, sin nombre, marca, talla ni notas.
-
-## Almacenamiento y privacidad
-
-Los datos se guardan en IndexedDB del perfil del navegador y las imágenes permanecen como `Blob` local. Los object URLs de miniaturas y previsualizaciones se revocan al actualizar o desmontar sus vistas. La aplicación no incorpora backend, inicio de sesión ni analítica. Pattern Waves usa WebGL local; los componentes Masonry y Pill Nav no envían datos. El análisis utiliza el modelo ONNX servido desde el mismo origen, sin enviar la fotografía. La función meteorológica es opcional: al usarla, el nombre de la ciudad y las coordenadas resueltas se consultan a Open-Meteo; el inventario, las preferencias y las fotografías no se incluyen en esas solicitudes. La política CSP permite conexiones únicamente al origen propio, y a los hosts de Open-Meteo usados por el pronóstico; el modelo se sirve desde el propio origen. La configuración PWA precachea recursos estáticos de la aplicación, pero no el modelo ni los datos personales. Esto describe el diseño del código; no constituye una auditoría de tráfico ni una prueba de red completa.
-
-Limpiar los datos del sitio o usar otro navegador/perfil elimina o separa el inventario. IndexedDB no implica cifrado en reposo. La solicitud de almacenamiento persistente es opcional y depende del soporte y decisión del navegador.
-
-La planificación de maleta requiere conexión para consultar la previsión de Open-Meteo. El pronóstico disponible depende del destino y de las fechas que cubra el proveedor; las combinaciones son sugerencias heurísticas, no una predicción de uso real. Las selecciones de la lista se mantienen en la pantalla actual y no se sincronizan ni se envían.
-
-## Pruebas
-
-```sh
-npm test
-npm run build
-```
-
-## TODOs y revisión del proyecto
-
-### Completado
-
-- [x] Navegación principal Armario, Outfits y Maleta; el alta de prendas está dentro de Armario.
-- [x] Outfits manuales y generados, guardados locales y feedback.
-- [x] Consulta de Open-Meteo para outfits de mañana y planificación de maleta.
-- [x] Swipe en móvil con botones alternativos accesibles.
-- [x] Galería incremental de 40 prendas por tanda.
-- [x] CSP con permisos explícitos para las APIs de geocodificación y previsión de Open-Meteo.
-
-### Pendiente
-
-- [ ] Completar la optimización del inventario: separar metadatos e imágenes en IndexedDB, cargar las miniaturas bajo demanda y medir el rendimiento con armarios grandes.
-- [ ] Guardar los planes de viaje y sus listas de maleta en IndexedDB para poder consultarlos después.
-- [ ] Definir una fuente fiable y una política de actualización para las tendencias antes de crear esa pantalla; indicar siempre la fuente y la fecha de los datos.
-- [ ] Validar el planificador meteorológico y las recomendaciones con más destinos, fechas, tamaños de armario y prendas sin atributos completos.
-- [ ] Revisar la distribución responsive y la navegación con pruebas de usabilidad en móvil y escritorio.
-- [ ] Analizar la división de los paquetes JavaScript de inferencia; la compilación advierte un chunk de Transformers superior a 500 kB.
+Copyright © 2026 Ximo Martínez. Todos los derechos reservados. Que el código sea visible no concede ninguna licencia de uso, copia, modificación ni distribución; ver [LICENSE](LICENSE). Los componentes de terceros (DINOv2, PaddleOCR, bibliotecas y datos de entrenamiento) conservan sus licencias, recogidas en [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
