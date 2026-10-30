@@ -1,6 +1,8 @@
 {
   "name": "vesta-virtual-wardrobe",
   "private": true,
+  "license": "UNLICENSED",
+  "author": "Ximo Martínez",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
