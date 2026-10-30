@@ -73,6 +73,35 @@ def class_weights(targets: np.ndarray, num_classes: int, power: float = 0.5) -> 
     return weights.astype(np.float32)
 
 
+def apply_rules(specs: list[HeadSpec], outputs: dict[str, np.ndarray],
+                taxonomy: Taxonomy) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+    """Make predictions consistent with the predicted category.
+
+    The subcategory must belong to the category (shoes cannot be a raincoat) and is hidden when the category has
+    no trained subcategories; attributes are hidden where they do not apply (Taxonomy.applies: sleeve outside
+    tops, fit outside trousers). Returns (logits, active), where active[head] is False for rows whose prediction
+    should be shown as unknown.
+    """
+    logits = dict(outputs)
+    active = {spec.name: np.ones(len(next(iter(outputs.values()))), dtype=bool) for spec in specs}
+    names = {spec.name: spec for spec in specs}
+    if "category" not in names:
+        return logits, active
+    category = np.array(names["category"].values)[outputs["category"].argmax(axis=1)]
+    if "subcategory" in names:
+        owner = np.array([taxonomy.category_of(value) for value in names["subcategory"].values])
+        allowed = owner[None, :] == category[:, None]
+        logits["subcategory"] = np.where(allowed, outputs["subcategory"], np.float32(-1e9))
+        active["subcategory"] = allowed.any(axis=1)
+    subcategory = [None] * len(category)
+    if "subcategory" in names:
+        subcategory = [names["subcategory"].values[int(row.argmax())] if on else None
+                       for row, on in zip(logits["subcategory"], active["subcategory"])]
+    for head in names.keys() & taxonomy.attributes.keys():
+        active[head] = np.array([taxonomy.applies(head, cat, sub) for cat, sub in zip(category, subcategory)], dtype=bool)
+    return logits, active
+
+
 def _per_class(true: np.ndarray, predicted: np.ndarray, values: list[str]) -> dict:
     """true/predicted are boolean (n, classes) indicator matrices."""
     report = {}
@@ -87,21 +116,26 @@ def _per_class(true: np.ndarray, predicted: np.ndarray, values: list[str]) -> di
     return report
 
 
-def evaluate(spec: HeadSpec, targets: np.ndarray, outputs: np.ndarray) -> dict | None:
-    """outputs: logits (n, classes). Macro-F1 averages only classes present in `targets`."""
+def evaluate(spec: HeadSpec, targets: np.ndarray, outputs: np.ndarray, active: np.ndarray | None = None) -> dict | None:
+    """outputs: logits (n, classes). Macro-F1 averages only classes present in `targets`.
+
+    Rows where `active` is False predict nothing, which counts as a miss when the row is labelled.
+    """
     mask = labeled_mask(targets, spec.multi_label)
     if not mask.any():
         return None
     targets, outputs = targets[mask], outputs[mask]
+    active = np.ones(len(targets), dtype=bool) if active is None else active[mask]
     classes = len(spec.values)
     if spec.multi_label:
         true = targets > 0.5
-        predicted = outputs > 0
+        predicted = (outputs > 0) & active[:, None]
         exact = float((true == predicted).all(axis=1).mean())
     else:
         true = np.eye(classes, dtype=bool)[targets]
-        predicted = np.eye(classes, dtype=bool)[outputs.argmax(axis=1)]
-        exact = float((outputs.argmax(axis=1) == targets).mean())
+        guesses = np.where(active, outputs.argmax(axis=1), MISSING)
+        predicted = np.eye(classes, dtype=bool)[guesses] & active[:, None]
+        exact = float((guesses == targets).mean())
     per_class = _per_class(true, predicted, spec.values)
     present = [entry["f1"] for entry in per_class.values() if entry["support"]]
     result = {
@@ -112,9 +146,9 @@ def evaluate(spec: HeadSpec, targets: np.ndarray, outputs: np.ndarray) -> dict |
     }
     if not spec.multi_label:
         confusions: Counter[tuple[str, str]] = Counter()
-        for truth, guess in zip(targets, outputs.argmax(axis=1)):
+        for truth, guess in zip(targets, guesses):
             if truth != guess:
-                confusions[(spec.values[truth], spec.values[guess])] += 1
+                confusions[(spec.values[truth], spec.values[guess] if guess != MISSING else "desconocido")] += 1
         result["topConfusions"] = [
             {"true": truth, "predicted": guess, "count": count} for (truth, guess), count in confusions.most_common(8)
         ]

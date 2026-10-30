@@ -44,6 +44,7 @@ export function toTrainingRecord(garment: Garment): TrainingRecord {
       category: (subcategory && categoryOfSubcategory(subcategory)) ?? categoryIdForLabel(garment.category),
       subcategory,
       sleeve: null,
+      fit: null,
       pattern: matchLabel('pattern', garment.pattern),
       formality: matchLabel('formality', garment.formality),
       seasons: uniqueMatches('seasons', garment.seasons),

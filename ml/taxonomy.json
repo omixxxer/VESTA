@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 4,
   "categories": [
     { "id": "top", "label": "Parte superior", "role": "Top" },
     { "id": "bottom", "label": "Parte inferior", "role": "Bottom" },
@@ -17,10 +17,9 @@
     { "id": "blusa", "label": "Blusa", "category": "top", "synonyms": [] },
     { "id": "top", "label": "Top", "category": "top", "synonyms": ["crop top", "body"] },
     { "id": "jersey", "label": "Jersey", "category": "top", "synonyms": ["sueter", "pullover", "jersey de punto"] },
-    { "id": "sudadera", "label": "Sudadera", "category": "top", "synonyms": ["sudadera sin capucha", "sweatshirt"] },
+    { "id": "sudadera", "label": "Sudadera", "category": "top", "synonyms": ["sudadera sin capucha", "sweatshirt", "quarter zip", "media cremallera", "medio cierre"] },
     { "id": "sudadera-capucha", "label": "Sudadera con capucha", "category": "top", "synonyms": ["hoodie"] },
     { "id": "prenda-deportiva", "label": "Prenda deportiva", "category": "top", "synonyms": ["camiseta deportiva", "top deportivo"] },
-    { "id": "tunica", "label": "Túnica", "category": "top", "synonyms": [] },
 
     { "id": "pantalon", "label": "Pantalón", "category": "bottom", "synonyms": ["pantalones", "chino", "chinos", "pantalon de vestir", "pantalon de invierno", "pantalon impermeable"] },
     { "id": "vaqueros", "label": "Vaqueros", "category": "bottom", "synonyms": ["jeans", "tejanos", "pantalon vaquero"] },
@@ -33,7 +32,7 @@
     { "id": "vestido", "label": "Vestido", "category": "one-piece", "synonyms": [] },
     { "id": "mono", "label": "Mono", "category": "one-piece", "synonyms": ["jumpsuit", "peto"] },
 
-    { "id": "chaqueta", "label": "Chaqueta", "category": "outerwear", "synonyms": ["cazadora", "bomber"] },
+    { "id": "chaqueta", "label": "Chaqueta", "category": "outerwear", "synonyms": ["cazadora", "bomber", "sobrecamisa", "overshirt"] },
     { "id": "blazer", "label": "Blazer", "category": "outerwear", "synonyms": ["americana"] },
     { "id": "abrigo", "label": "Abrigo", "category": "outerwear", "synonyms": ["gabardina", "trench", "parka"] },
     { "id": "plumifero", "label": "Plumífero", "category": "outerwear", "synonyms": ["puffer", "chaqueta de invierno", "anorak acolchado"] },
@@ -44,7 +43,9 @@
     { "id": "zapatillas", "label": "Zapatillas", "category": "footwear", "synonyms": ["deportivas", "sneakers", "tenis"] },
     { "id": "zapatos", "label": "Zapatos", "category": "footwear", "synonyms": ["zapato", "mocasines", "mocasin"] },
     { "id": "botas", "label": "Botas", "category": "footwear", "synonyms": ["bota", "botines", "botin"] },
-    { "id": "sandalias", "label": "Sandalias", "category": "footwear", "synonyms": ["sandalia", "chanclas"] },
+    { "id": "sandalias", "label": "Sandalias", "category": "footwear", "synonyms": ["sandalia"] },
+    { "id": "chanclas", "label": "Chanclas", "category": "footwear", "synonyms": ["chancla", "flip flops", "chanclas de piscina", "slides"] },
+    { "id": "zuecos", "label": "Zuecos", "category": "footwear", "synonyms": ["zueco", "clogs", "crocs"] },
     { "id": "tacones", "label": "Tacones", "category": "footwear", "synonyms": ["zapatos de tacon"] },
 
     { "id": "gorro", "label": "Gorro / sombrero", "category": "accessory", "synonyms": ["gorro", "sombrero", "gorra"] },
@@ -64,6 +65,17 @@
         { "id": "corta", "label": "Manga corta", "synonyms": ["corta"] },
         { "id": "tres-cuartos", "label": "Manga francesa", "synonyms": ["tres cuartos", "manga tres cuartos"] },
         { "id": "larga", "label": "Manga larga", "synonyms": ["larga"] }
+      ]
+    },
+    "fit": {
+      "multiLabel": false,
+      "appliesTo": ["bottom"],
+      "appliesToSubcategories": ["pantalon", "vaqueros", "pantalon-chandal", "leggings"],
+      "values": [
+        { "id": "ajustado", "label": "Ajustado", "synonyms": ["pitillo", "skinny", "slim", "ceñido", "entallado"] },
+        { "id": "recto", "label": "Recto", "synonyms": ["straight", "regular", "corte recto"] },
+        { "id": "ancho", "label": "Ancho", "synonyms": ["baggy", "holgado", "wide leg", "oversize", "oversized", "palazzo"] },
+        { "id": "campana", "label": "Campana", "synonyms": ["acampanado", "bootcut", "flare", "pata de elefante"] }
       ]
     },
     "pattern": {

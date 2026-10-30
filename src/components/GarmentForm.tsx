@@ -28,8 +28,7 @@ const feminineSubcategories = new Set([
   'medias',
   'prenda deportiva',
   'prenda de abrigo',
-  'sudadera con capucha',
-  'túnica'
+  'sudadera con capucha'
 ])
 const feminineColors: Record<string, string> = {
   blanco: 'blanca',

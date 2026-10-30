@@ -6,13 +6,40 @@ import argparse
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .common import assign_split, data_dir, read_jsonl, write_jsonl
-from .sources import clothing_dataset, fashionpedia, vesta_export
-from .taxonomy import LABEL_HEADS, MULTI_LABEL_HEADS
+from .common import assign_split, data_dir, empty_labels, read_jsonl, write_jsonl
+from .reviews import apply_decisions, load_decisions
+from .sources import clothing_dataset, fashionpedia, open_images, photo_folders, vesta_export
+from .taxonomy import LABEL_HEADS, MULTI_LABEL_HEADS, Taxonomy, load_taxonomy
 
 # Own photos are scarce and the closest to real use, so half of them are held out for testing.
 SPLIT_RATIOS = {vesta_export.SOURCE: (0.5, 0.0, 0.5)}
 DEFAULT_SPLIT_RATIOS = (0.8, 0.1, 0.1)
+
+
+def drop_removed_values(records: list[dict], taxonomy: Taxonomy) -> Counter:
+    """Labels whose value left the taxonomy (e.g. túnica in v3) become unknown instead of breaking training.
+
+    The old value stays in meta.removedLabels so those images can be relabeled (propose --relabel tunica).
+    """
+    removed: Counter[str] = Counter()
+    for record in records:
+        labels, dropped = record["labels"], {}
+        for head in LABEL_HEADS:
+            known = set(taxonomy.head_values(head))
+            value = labels[head]
+            if head in MULTI_LABEL_HEADS and value is not None:
+                kept = [item for item in value if item in known]
+                if len(kept) < len(value):
+                    dropped[head] = [item for item in value if item not in known]
+                labels[head] = kept or None
+            elif value is not None and value not in known:
+                dropped[head] = value
+                labels[head] = None
+        if dropped:
+            record["meta"] = {**record.get("meta", {}), "removedLabels": dropped}
+            for value in dropped.values():
+                removed.update(value if isinstance(value, list) else [value])
+    return removed
 
 
 def merge(root: Path) -> Path:
@@ -20,9 +47,20 @@ def merge(root: Path) -> Path:
     for manifest in sorted((root / "sources").glob("*/manifest.jsonl")):
         for record in read_jsonl(manifest):
             record["split"] = assign_split(record["group"], SPLIT_RATIOS.get(record["source"], DEFAULT_SPLIT_RATIOS))
+            # Sources prepared before a head was added (e.g. fit in v4) lack it: unknown.
+            record["labels"] = {**empty_labels(), **record["labels"]}
             records.append(record)
     if not records:
         raise SystemExit("No hay fuentes preparadas en " + str(root / "sources"))
+    if removed := drop_removed_values(records, load_taxonomy()):
+        print("Valores retirados de la taxonomía (quedan como desconocidos): "
+              + ", ".join(f"{value}={count}" for value, count in removed.most_common()))
+    decisions = load_decisions()
+    before = len(records)
+    records = apply_decisions(records, decisions)
+    reviewed = sum(record["meta"].get("subcategorySource") == "review" for record in records)
+    if decisions:
+        print(f"Revisiones: {reviewed} subcategorías añadidas, {before - len(records)} imágenes descartadas")
     output = root / "manifest.jsonl"
     write_jsonl(output, records)
     print(f"Manifiesto unificado: {output} ({len(records)} imágenes)")
@@ -62,6 +100,12 @@ def main() -> None:
     pedia.add_argument("--include-share-alike", action="store_true",
                        help="Incluye fotos CC BY-SA; revisa antes si es compatible con tu uso")
     pedia.add_argument("--limit", type=int)
+    oi = commands.add_parser("open-images", help="Recortes de Open Images (CC BY) de las clases de source_mappings.json")
+    oi.add_argument("--subsets", nargs="+", choices=sorted(open_images.BOXES_PATHS), default=["train", "validation", "test"],
+                    help="train lee ~3 GB de CSV en streaming; validation y test son pequeños")
+    oi.add_argument("--max-per-subcategory", type=int)
+    folders = commands.add_parser("photo-folders", help="Fotos de Unsplash/Pexels en carpetas con nombre de subcategoría")
+    folders.add_argument("folder", type=Path, help="Carpeta raíz; sustituye a la importación anterior")
     own = commands.add_parser("vesta-export", help="Importa el ZIP exportado desde la app")
     own.add_argument("archive", type=Path)
     commands.add_parser("merge", help="Une las fuentes preparadas en manifest.jsonl con splits")
@@ -73,6 +117,10 @@ def main() -> None:
         clothing_dataset.prepare(root, arguments.limit)
     elif arguments.command == "fashionpedia":
         fashionpedia.prepare(root, arguments.split, arguments.include_share_alike, arguments.limit)
+    elif arguments.command == "open-images":
+        open_images.prepare(root, arguments.subsets, arguments.max_per_subcategory)
+    elif arguments.command == "photo-folders":
+        photo_folders.prepare(root, arguments.folder)
     elif arguments.command == "vesta-export":
         vesta_export.prepare(root, arguments.archive)
     else:

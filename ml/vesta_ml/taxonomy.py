@@ -13,7 +13,7 @@ ML_ROOT = Path(__file__).resolve().parent.parent
 TAXONOMY_PATH = ML_ROOT / "taxonomy.json"
 SOURCE_MAPPINGS_PATH = ML_ROOT / "source_mappings.json"
 
-LABEL_HEADS = ("category", "subcategory", "sleeve", "pattern", "formality", "seasons", "colors")
+LABEL_HEADS = ("category", "subcategory", "sleeve", "fit", "pattern", "formality", "seasons", "colors")
 MULTI_LABEL_HEADS = ("seasons", "colors")
 
 
@@ -21,6 +21,11 @@ def normalize(text: str) -> str:
     decomposed = unicodedata.normalize("NFD", text.lower())
     without_accents = "".join(char for char in decomposed if unicodedata.category(char) != "Mn")
     return re.sub(r"[^a-z0-9]+", " ", without_accents).strip()
+
+
+def plural_pattern(phrase: str) -> str:
+    """Each word also matches its Spanish plural: azul → azules, pantalon corto → pantalones cortos."""
+    return " ".join(f"{re.escape(word)}(?:e?s)?" for word in phrase.split(" "))
 
 
 @dataclass(frozen=True, eq=False)
@@ -40,6 +45,18 @@ class Taxonomy:
     def category_of(self, subcategory: str) -> str:
         return self.subcategories[subcategory]["category"]
 
+    def applies(self, head: str, category: str | None, subcategory: str | None) -> bool:
+        """Whether an attribute makes sense for a garment (sleeve on tops, fit on trousers…).
+
+        appliesToSubcategories only rules out a known subcategory outside the list: a garment of the right category
+        without subcategory may still carry the attribute.
+        """
+        attribute = self.attributes.get(head, {})
+        if "appliesTo" in attribute and category not in attribute["appliesTo"]:
+            return False
+        allowed = attribute.get("appliesToSubcategories")
+        return allowed is None or subcategory is None or subcategory in allowed
+
     def match(self, head: str, text: str | None) -> str | None:
         """Map free text to a value id; the longest matching phrase wins."""
         if not text:
@@ -52,7 +69,7 @@ class Taxonomy:
             for phrase in phrases:
                 if normalized == phrase:
                     return value_id
-                if re.search(rf"(^| ){re.escape(phrase)}( |$)", normalized):
+                if re.search(rf"(^| ){plural_pattern(phrase)}( |$)", normalized):
                     if best is None or len(phrase) > best[0]:
                         best = (len(phrase), value_id)
         return best[1] if best else None

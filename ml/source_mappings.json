@@ -58,7 +58,6 @@
       "crop (top)": "top",
       "halter (top)": "top",
       "tube (top)": "top",
-      "tunic (top)": "tunica",
       "hoodie": "sudadera-capucha",
       "blazer": "blazer",
       "tuxedo (jacket)": "blazer",
@@ -117,6 +116,34 @@
       "wrist-length": "larga"
     },
     "garmentSleevelessAttribute": "sleeveless",
-    "sleeveCategory": "sleeve"
+    "sleeveCategory": "sleeve",
+    "fits": {
+      "tight (fit)": "ajustado",
+      "regular (fit)": "recto",
+      "straight": "recto",
+      "loose (fit)": "ancho",
+      "wide leg": "ancho",
+      "oversized": "ancho",
+      "baggy": "ancho",
+      "bootcut": "campana",
+      "bell bottom": "campana",
+      "flare": "campana"
+    },
+    "fitPriority": ["campana", "ancho", "ajustado", "recto"],
+    "fitCategories": ["pants"]
+  },
+  "open-images": {
+    "classes": {
+      "Watch": "reloj",
+      "Tie": "corbata",
+      "Glasses": "gafas",
+      "Sunglasses": "gafas",
+      "Sandal": "sandalias",
+      "Boot": "botas",
+      "Scarf": "bufanda",
+      "Belt": "cinturon"
+    },
+    "commercialLicenses": ["https://creativecommons.org/licenses/by/2.0/"],
+    "maxPerSubcategory": 800
   }
 }

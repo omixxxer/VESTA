@@ -74,6 +74,14 @@ describe('taxonomy matching', () => {
     expect(matchLabel('colors', 'Azul marino')).toBe('azul-marino')
     expect(matchLabel('subcategory', 'Kimono raro')).toBeNull()
   })
+
+  it('matches Spanish plurals and recent synonyms', () => {
+    expect(matchLabel('colors', 'Azules')).toBe('azul')
+    expect(matchLabel('subcategory', 'Pantalones cortos')).toBe('pantalon-corto')
+    expect(matchLabel('subcategory', 'Zuecos')).toBe('zuecos')
+    expect(matchLabel('subcategory', 'Chanclas')).toBe('chanclas')
+    expect(matchLabel('subcategory', 'Quarter zip')).toBe('sudadera')
+  })
 })
 
 describe('training export', () => {
@@ -83,6 +91,7 @@ describe('training export', () => {
       category: 'top',
       subcategory: 'jersey',
       sleeve: null,
+      fit: null,
       pattern: 'rayas',
       formality: 'smart-casual',
       seasons: ['otono', 'invierno'],
@@ -105,7 +114,7 @@ describe('training export', () => {
     expect(entries.map((entry) => entry.name)).toEqual(['export.json', 'labels.jsonl', 'images/g1-0.jpg', 'images/g1-1.png'])
     for (const entry of entries) expect(entry.crc).toBe(crc32(entry.data))
     const info = JSON.parse(new TextDecoder().decode(entries[0]!.data))
-    expect(info).toMatchObject({ format: EXPORT_FORMAT, taxonomyVersion: 1, garments: 1 })
+    expect(info).toMatchObject({ format: EXPORT_FORMAT, taxonomyVersion: 4, garments: 1 })
     expect(new TextDecoder().decode(entries[3]!.data)).toBe('detalle')
   })
 

@@ -2,7 +2,7 @@ import taxonomyJson from '../../ml/taxonomy.json'
 import type { GarmentCategory } from '../types/domain'
 
 // Mirrors ml/vesta_ml/taxonomy.py; both read ml/taxonomy.json.
-export type LabelHead = 'category' | 'subcategory' | 'sleeve' | 'pattern' | 'formality' | 'seasons' | 'colors'
+export type LabelHead = 'category' | 'subcategory' | 'sleeve' | 'fit' | 'pattern' | 'formality' | 'seasons' | 'colors'
 export type AttributeHead = Exclude<LabelHead, 'category' | 'subcategory'>
 
 interface TaxonomyValue {
@@ -29,7 +29,12 @@ function valuesFor(head: LabelHead): TaxonomyValue[] {
   return taxonomy.attributes[head].values
 }
 
-const phraseCache = new Map<LabelHead, Array<[string, string[]]>>()
+interface Phrase { text: string; pattern: RegExp }
+
+const phraseCache = new Map<LabelHead, Array<[string, Phrase[]]>>()
+
+// Each word also matches its Spanish plural (azul → azules); normalized words are [a-z0-9] only.
+const pluralPattern = (phrase: string) => new RegExp(`(^| )${phrase.split(' ').map((word) => `${word}(?:e?s)?`).join(' ')}( |$)`)
 
 function phrasesFor(head: LabelHead) {
   let phrases = phraseCache.get(head)
@@ -37,6 +42,7 @@ function phrasesFor(head: LabelHead) {
     phrases = valuesFor(head).map((value) => [
       value.id,
       [...new Set([value.id, value.label, ...(value.synonyms ?? [])].map(normalizeLabel).filter(Boolean))]
+        .map((text) => ({ text, pattern: pluralPattern(text) }))
     ])
     phraseCache.set(head, phrases)
   }
@@ -49,9 +55,9 @@ export function matchLabel(head: LabelHead, text: string | undefined): string | 
   if (!normalized) return null
   let best: { length: number; id: string } | null = null
   for (const [id, phrases] of phrasesFor(head)) {
-    for (const phrase of phrases) {
+    for (const { text: phrase, pattern } of phrases) {
       if (normalized === phrase) return id
-      if (` ${normalized} `.includes(` ${phrase} `) && (!best || phrase.length > best.length)) {
+      if (pattern.test(normalized) && (!best || phrase.length > best.length)) {
         best = { length: phrase.length, id }
       }
     }

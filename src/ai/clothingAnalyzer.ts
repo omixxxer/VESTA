@@ -67,7 +67,7 @@ const modelClasses: Candidate[] = [
   { label: 'Top', category: 'Parte superior', subcategory: 'Top' },
   { label: 'Training top', category: 'Parte superior', subcategory: 'Prenda deportiva' },
   { label: 'Trousers', category: 'Parte inferior', subcategory: 'Pantalón' },
-  { label: 'Tunic', category: 'Parte superior', subcategory: 'Túnica' },
+  { label: 'Tunic', category: 'Parte superior', subcategory: 'Blusa' },
   { label: 'Vest', category: 'Abrigo', subcategory: 'Chaleco' },
   { label: 'Winter jacket', category: 'Abrigo', subcategory: 'Chaqueta de invierno' },
   { label: 'Winter trousers', category: 'Parte inferior', subcategory: 'Pantalón de invierno' }

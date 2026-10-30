@@ -19,7 +19,7 @@ from torch.nn import functional as F
 from .common import data_dir, read_jsonl
 from .embed import cache_dir
 from .features import FEATURE_DIM, PREPROCESSING, EmbeddingCache
-from .targets import MISSING, HeadSpec, class_weights, encode, evaluate, head_specs
+from .targets import MISSING, HeadSpec, apply_rules, class_weights, encode, evaluate, head_specs
 from .taxonomy import LABEL_HEADS, load_taxonomy
 
 SPLITS = ("train", "val", "test")
@@ -61,8 +61,9 @@ def predict(model: MultiHead, features: torch.Tensor) -> dict[str, np.ndarray]:
 
 
 def score(specs: list[HeadSpec], targets: dict[str, np.ndarray], outputs: dict[str, np.ndarray]) -> tuple[float, dict]:
-    """Mean macro-F1 over heads that have labels in this split."""
-    report = {spec.name: evaluate(spec, targets[spec.name], outputs[spec.name]) for spec in specs}
+    """Mean macro-F1 over heads that have labels in this split, after the category consistency rules."""
+    logits, active = apply_rules(specs, outputs, load_taxonomy())
+    report = {spec.name: evaluate(spec, targets[spec.name], logits[spec.name], active[spec.name]) for spec in specs}
     values = [entry["macroF1"] for entry in report.values() if entry]
     return (float(np.mean(values)) if values else 0.0), report
 
@@ -128,7 +129,7 @@ def main() -> None:
             loss.backward()
             optimizer.step()
             scheduler.step()
-            total += float(loss)
+            total += loss.item()
         val_score, _ = score(specs, targets["val"], predict(model, split_features["val"]))
         improved = val_score > best_score
         if improved:
@@ -162,6 +163,10 @@ def main() -> None:
         "heads": [{"name": spec.name, "multiLabel": spec.multi_label, "values": spec.values, "dropped": spec.dropped}
                   for spec in specs],
         "untrainedHeads": skipped,
+        # Applied after the model (see targets.apply_rules); the app must do the same.
+        "rules": {"subcategoryWithinCategory": True, "attributesApplyTo": {
+            head: {key: attribute[key] for key in ("appliesTo", "appliesToSubcategories") if key in attribute}
+            for head, attribute in taxonomy.attributes.items() if "appliesTo" in attribute}},
         "training": {**vars(arguments), "bestEpoch": best_epoch, "examples": {split: len(by_split[split]) for split in SPLITS}},
     }
     (output / "heads.json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")

@@ -1,4 +1,4 @@
-"""Fashionpedia: prendas recortadas de fotos de personas, con estampado y largo de manga.
+"""Fashionpedia: prendas recortadas de fotos de personas, con estampado, largo de manga y corte de pantalón.
 
 Las anotaciones son CC BY 4.0, pero cada foto conserva la licencia de su autor. Solo se
 usan las fotos cuya licencia permite uso comercial y obras derivadas (ver
@@ -39,6 +39,18 @@ def _contains_center(outer: list[float], inner: list[float]) -> bool:
     center_x = inner[0] + inner[2] / 2
     center_y = inner[1] + inner[3] / 2
     return x <= center_x <= x + width and y <= center_y <= y + height
+
+
+def fit_from(category: str, names: list[str], mapping: dict) -> str | None:
+    """Trouser fit from Fashionpedia silhouette attributes.
+
+    A garment often has several (regular fit + bootcut): the leg shape wins over the generic fit, following
+    fitPriority. "peg" (tapered) is left out: it is neither skinny nor straight.
+    """
+    if category not in mapping["fitCategories"]:
+        return None
+    fits = {mapping["fits"][name] for name in names if name in mapping["fits"]}
+    return next((fit for fit in mapping["fitPriority"] if fit in fits), None)
 
 
 def garment_records(annotations: dict, include_share_alike: bool = False) -> list[dict]:
@@ -92,6 +104,9 @@ def garment_records(annotations: dict, include_share_alike: bool = False) -> lis
                     }
                 if len(sleeve_values) == 1:
                     labels["sleeve"] = sleeve_values.pop()
+
+            if fit := fit_from(categories[annotation["category_id"]], names, mapping):
+                labels["fit"] = fit
 
             pad_x, pad_y = width * CROP_PADDING, height * CROP_PADDING
             box = (

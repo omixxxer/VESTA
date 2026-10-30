@@ -84,6 +84,28 @@ class TargetsTest(unittest.TestCase):
         self.assertEqual(result["topConfusions"][0], {"true": "top", "predicted": "bottom", "count": 1})
 
 
+class RulesTest(unittest.TestCase):
+    def test_subcategory_stays_within_category_and_sleeve_is_hidden_elsewhere(self):
+        from vesta_ml.targets import HeadSpec, apply_rules
+
+        taxonomy = load_taxonomy()
+        specs = [HeadSpec("category", False, ["top", "outerwear", "footwear"], []),
+                 HeadSpec("subcategory", False, ["camiseta", "chubasquero"], []),
+                 HeadSpec("sleeve", False, ["corta", "larga"], [])]
+        outputs = {
+            "category": np.array([[0, 0, 5], [5, 0, 0]], dtype=np.float32),
+            "subcategory": np.array([[0, 3], [0, 3]], dtype=np.float32),  # raw argmax: chubasquero for both
+            "sleeve": np.array([[1, 0], [1, 0]], dtype=np.float32),
+        }
+        logits, active = apply_rules(specs, outputs, taxonomy)
+        self.assertEqual(active["subcategory"].tolist(), [False, True])  # no footwear subtypes trained
+        self.assertEqual(int(logits["subcategory"][1].argmax()), 0)  # a top cannot be a raincoat
+        self.assertEqual(active["sleeve"].tolist(), [False, True])
+        result = evaluate(specs[1], np.array([1, 0]), logits["subcategory"], active["subcategory"])
+        self.assertEqual(result["accuracy"], 0.5)
+        self.assertEqual(result["topConfusions"][0]["predicted"], "desconocido")
+
+
 @unittest.skipUnless(torch, "torch no instalado")
 class LossTest(unittest.TestCase):
     def test_loss_ignores_unlabeled_rows(self):
@@ -98,6 +120,41 @@ class LossTest(unittest.TestCase):
         multi = HeadSpec("seasons", True, ["verano", "invierno"], [])
         targets = torch.tensor([[1.0, 0.0], [MISSING, MISSING]])
         self.assertLess(float(head_loss(multi, logits, targets, None, 0.0)), 1e-2)
+
+
+@unittest.skipUnless(torch, "torch no instalado")
+class FolderEvaluationTest(unittest.TestCase):
+    def test_labels_come_from_the_outermost_matching_folder(self):
+        from vesta_ml.evaluate import folder_records
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in ("Botas/botas marrones/1.jpg", "Calzado/zuecos/2.png", "Calzado/3.jpg", "varios/4.jpg"):
+                (root / relative).parent.mkdir(parents=True, exist_ok=True)
+                Image.new("RGB", (8, 8), "red").save(root / relative)
+            (root / "Calzado" / "roto.jpg").write_bytes(b"no es una imagen")
+            (root / "Calzado" / "fuentes.txt").write_text("http://example")
+            records, skipped = folder_records(root, load_taxonomy())
+            labels = {item["id"]: (item["labels"]["category"], item["labels"]["subcategory"]) for item in records}
+            self.assertEqual(labels, {"Botas/botas marrones/1.jpg": ("footwear", "botas"),
+                                      "Calzado/zuecos/2.png": ("footwear", "zuecos"),
+                                      "Calzado/3.jpg": ("footwear", None)})
+            self.assertEqual(len(skipped), 2)
+
+
+@unittest.skipUnless(torch, "torch no instalado")
+class DisagreementTest(unittest.TestCase):
+    def test_only_confident_contradictions_with_the_label_first(self):
+        from vesta_ml.disagree import disagreements
+        from vesta_ml.targets import HeadSpec
+
+        spec = HeadSpec("subcategory", False, ["camisa", "blusa", "polo"], [])
+        records = [{"id": name, "labels": {"subcategory": label}} for name, label in
+                   (("wrong", "camisa"), ("unsure", "camisa"), ("agrees", "polo"), ("untrained", "jersey"))]
+        probabilities = np.array([[0.1, 0.8, 0.1], [0.3, 0.6, 0.1], [0.1, 0.1, 0.8], [0.1, 0.8, 0.1]])
+        found = disagreements(records, spec, probabilities, ["blusa", "blusa", "polo", "blusa"], 0.5, 0.2)
+        self.assertEqual([record["id"] for record, _ in found], ["wrong"])
+        self.assertEqual([value for value, _ in found[0][1]], ["camisa", "blusa", "polo"])
 
 
 if __name__ == "__main__":
