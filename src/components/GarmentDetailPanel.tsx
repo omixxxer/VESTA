@@ -20,7 +20,9 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
   const [deleteError, setDeleteError] = useState('')
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
   const photos = [garment.image, ...(garment.additionalImages ?? [])]
-  const selectedPhoto = photos[selectedPhotoIndex] ?? photos[0]
+  // The label photo is shown last, apart from the garment photos.
+  const viewable = garment.labelImage ? [...photos, garment.labelImage] : photos
+  const selectedPhoto = viewable[selectedPhotoIndex] ?? photos[0]
 
   useEffect(() => {
     setSelectedPhotoIndex(0)
@@ -79,7 +81,7 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
     <div className="panel-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section ref={panelRef} className={`detail-panel ${isEditing ? 'editing' : ''}`} role="dialog" aria-modal="true" aria-labelledby="detail-title" tabIndex={-1}>
         <header className="detail-header">
-          <p className="eyebrow">{isEditing ? 'EDITAR PRENDA' : 'DETALLE DE LA PRENDA'}</p>
+          <p className="eyebrow">{isEditing ? 'EDITAR PRENDA' : 'DETALLE DE LA PRENDA'}{garment.code && <span className="garment-code">{garment.code}</span>}</p>
           <button className="close-button" type="button" onClick={onClose} aria-label="Cerrar detalle">×</button>
         </header>
         {isEditing ? (
@@ -100,15 +102,15 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
             {selectedPhoto && (
               <>
                 <GarmentPhoto image={selectedPhoto} className="detail-photo" alt={garment.name || garment.category} />
-                {photos.length > 1 && (
+                {viewable.length > 1 && (
                   <div className="detail-photo-list" aria-label="Fotos de la prenda">
-                    {photos.map((photo, index) => (
+                    {viewable.map((photo, index) => (
                       <button
-                        className={index === selectedPhotoIndex ? 'selected' : ''}
+                        className={`${index === selectedPhotoIndex ? 'selected' : ''} ${index >= photos.length ? 'label-thumb' : ''}`}
                         type="button"
                         key={index}
                         onClick={() => setSelectedPhotoIndex(index)}
-                        aria-label={`Ver foto ${index + 1}`}
+                        aria-label={index >= photos.length ? 'Ver etiqueta' : `Ver foto ${index + 1}`}
                         aria-pressed={index === selectedPhotoIndex}
                       >
                         <GarmentPhoto image={photo} alt="" />
@@ -124,9 +126,10 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
               <div><dt>Estampado</dt><dd>{garment.pattern || 'Sin especificar'}</dd></div>
               <div><dt>Marca</dt><dd>{garment.brand || 'Sin especificar'}</dd></div>
               <div><dt>Talla</dt><dd>{garment.size || 'Sin especificar'}</dd></div>
+              {garment.composition && <div><dt>Composición</dt><dd>{garment.composition}</dd></div>}
               <div><dt>Temporadas</dt><dd>{garment.seasons.join(', ') || 'Sin especificar'}</dd></div>
-              <div><dt>Estilos</dt><dd>{garment.styles.join(', ') || 'Sin especificar'}</dd></div>
-              <div><dt>Formalidad</dt><dd>{garment.formality}</dd></div>
+              <div><dt>Estilo</dt><dd>{garment.dressLevels.join(', ') || 'Sin especificar'}</dd></div>
+              <div><dt>Estética</dt><dd>{garment.styles.join(', ') || 'Sin especificar'}</dd></div>
               {garment.analysis && (
                 <div className="property-notes">
                   <dt>Procedencia del análisis</dt>
@@ -139,7 +142,7 @@ export default function GarmentDetailPanel({ garment, onClose, onSave, onDelete 
                         : garment.analysis.sourcesByAttribute.category === 'wargon-vit'
                           ? 'clasificación ViT de 27 clases'
                           : 'clasificador de imágenes'}; color: muestreo de píxeles.
-                    {' '}Puntuación no calibrada de categoría: {((garment.analysis.confidenceByAttribute.category ?? 0) * 100).toFixed(1)}%;
+                    {' '}{garment.analysis.calibrated ? 'Confianza calibrada' : 'Puntuación no calibrada'} de categoría: {((garment.analysis.confidenceByAttribute.category ?? 0) * 100).toFixed(1)}%;
                     {' '}predominio heurístico del color: {((garment.analysis.confidenceByAttribute.colors ?? 0) * 100).toFixed(1)}%.
                     {' '}Atributos corregidos: {garment.analysis.correctedAttributes.join(', ') || 'ninguno registrado'}.
                     {' '}Sin detección validada de {garment.analysis.unknownAttributes.join(', ')}.

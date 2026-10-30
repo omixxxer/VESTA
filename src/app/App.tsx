@@ -84,7 +84,7 @@ function App() {
   const visibleGarments = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase('es')
     return garments.filter((garment) => {
-      const searchableText = [garment.name, garment.subcategory, garment.brand, ...garment.colors]
+      const searchableText = [garment.code, garment.name, garment.subcategory, garment.brand, ...garment.colors]
         .filter(Boolean)
         .join(' ')
         .toLocaleLowerCase('es')
@@ -104,7 +104,7 @@ function App() {
       const img = URL.createObjectURL(garment.thumbnail ?? garment.image)
       urls.push(img)
       const label = getGarmentLabel(garment)
-      const details = [garment.category, ...garment.colors].filter(Boolean).join(' · ')
+      const details = [garment.code, garment.category, ...garment.colors].filter(Boolean).join(' · ')
       return {
         id: garment.id,
         garmentId: garment.id,

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type TouchEvent } from 'react'
 import { database } from '../db/database'
-import type { Garment, Outfit, UserPreferences } from '../types/domain'
+import { dressLevels, type DressLevel, type Garment, type Outfit, type UserPreferences } from '../types/domain'
 import GarmentPhoto from './GarmentPhoto'
 import { getCityForecast } from '../weather/openMeteo'
 import {
@@ -18,7 +18,7 @@ interface OutfitGeneratorProps {
   onAvailabilityChange: (garment: Garment) => Promise<void>
 }
 
-const occasions: OutfitTemplate[] = ['Casual', 'Smart casual', 'Formal', 'Deportivo', 'Frío y capas', 'Calor y pocas capas']
+const occasions: OutfitTemplate[] = ['Diario', 'Arreglado', 'Formal', 'Deportivo', 'Frío y capas', 'Calor y pocas capas']
 const emptyPreferences: UserPreferences = {
   id: 'current',
   preferredColors: [],
@@ -39,7 +39,7 @@ function garmentLabel(garment: Garment) {
 }
 
 export default function OutfitGenerator({ garments, onAvailabilityChange }: OutfitGeneratorProps) {
-  const [occasion, setOccasion] = useState<OutfitTemplate>('Casual')
+  const [occasion, setOccasion] = useState<OutfitTemplate>('Diario')
   const [view, setView] = useState<OutfitView>('generate')
   const [desiredStyle, setDesiredStyle] = useState('')
   const [temperature, setTemperature] = useState('')
@@ -252,7 +252,7 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
             {occasions.map((item) => <option key={item}>{item}</option>)}
           </select>
         </label>
-        <label className="form-field">Estilo deseado
+        <label className="form-field">Estética deseada
           <select value={desiredStyle} onChange={(event) => setDesiredStyle(event.target.value)}>
             <option value="">Sin preferencia</option>
             {wardrobeStyles.map((style) => <option key={style}>{style}</option>)}
@@ -303,13 +303,13 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
           <label className="form-field">Colores preferidos (separados por coma)
             <input value={preferences.preferredColors.join(', ')} onChange={(event) => setPreferences({ ...preferences, preferredColors: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) })} />
           </label>
-          <label className="form-field">Estilos preferidos (separados por coma)
+          <label className="form-field">Estéticas preferidas (separadas por coma)
             <input value={preferences.preferredStyles.join(', ')} onChange={(event) => setPreferences({ ...preferences, preferredStyles: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) })} />
           </label>
-          <label className="form-field">Formalidad preferida
-            <select value={preferences.preferredFormality ?? ''} onChange={(event) => setPreferences({ ...preferences, preferredFormality: (event.target.value || undefined) as UserPreferences['preferredFormality'] })}>
+          <label className="form-field">Estilo preferido
+            <select value={preferences.preferredDressLevel ?? ''} onChange={(event) => setPreferences({ ...preferences, preferredDressLevel: (event.target.value || undefined) as DressLevel | undefined })}>
               <option value="">Sin preferencia</option>
-              <option>Casual</option><option>Smart casual</option><option>Formal</option>
+              {dressLevels.map((level) => <option key={level}>{level}</option>)}
             </select>
           </label>
           <div className="preference-actions">
@@ -320,7 +320,7 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
       </details>
 
       <p className="score-note">
-        Puntuación (0–100): ocasión {Math.round(OUTFIT_SCORE_WEIGHTS.occasion * 100)}% (formalidad y contexto), visual/estilo {Math.round(OUTFIT_SCORE_WEIGHTS.visualStyle * 100)}% (colores, estampado y estilo), clima {Math.round(OUTFIT_SCORE_WEIGHTS.thermal * 100)}% (temperatura, capas y temporadas), preferencias {Math.round(OUTFIT_SCORE_WEIGHTS.preference * 100)}% (preferencias y feedback) y rotación {Math.round(OUTFIT_SCORE_WEIGHTS.rotation * 100)}% (repetición reciente). Los atributos ausentes no causan descartes automáticos.
+        Puntuación (0–100): ocasión {Math.round(OUTFIT_SCORE_WEIGHTS.occasion * 100)}% (estilo de cada prenda y contexto), visual {Math.round(OUTFIT_SCORE_WEIGHTS.visualStyle * 100)}% (colores, estampado y estética), clima {Math.round(OUTFIT_SCORE_WEIGHTS.thermal * 100)}% (temperatura, capas y temporadas), preferencias {Math.round(OUTFIT_SCORE_WEIGHTS.preference * 100)}% (preferencias y feedback) y rotación {Math.round(OUTFIT_SCORE_WEIGHTS.rotation * 100)}% (repetición reciente). Los atributos ausentes no causan descartes automáticos.
       </p>
       <div className="outfit-generate-actions">
         <button className="button button-dark" type="button" onClick={() => void generate()} disabled={loading || garments.length === 0}>

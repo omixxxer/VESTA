@@ -10,7 +10,7 @@ const garment = (id: string, role: Garment['role'], extras: Partial<Garment> = {
   colors: [],
   seasons: [],
   styles: [],
-  formality: 'Casual',
+  dressLevels: ['Diario'],
   role,
   image: new Blob(['photo']),
   thumbnail: new Blob(['thumbnail']),
@@ -33,7 +33,7 @@ const basicWardrobe = () => [
 describe('outfit generator', () => {
   it('builds candidates only from actual available wardrobe records', () => {
     const wardrobe = basicWardrobe()
-    const results = generateOutfitCandidates(wardrobe, { occasion: 'Casual' })
+    const results = generateOutfitCandidates(wardrobe, { occasion: 'Diario' })
 
     expect(results.length).toBeGreaterThan(0)
     for (const result of results) {
@@ -68,7 +68,7 @@ describe('outfit generator', () => {
     const results = generateOutfitCandidates([
       garment('unknown-top', 'Top'),
       garment('unknown-bottom', 'Bottom')
-    ], { occasion: 'Casual' })
+    ], { occasion: 'Diario' })
     expect(results).toHaveLength(1)
     expect(results[0]?.score).toBeGreaterThanOrEqual(0)
     expect(results[0]?.score).toBeLessThanOrEqual(100)
@@ -76,18 +76,18 @@ describe('outfit generator', () => {
 
   it('responds to occasion, weather and personal preferences', () => {
     const wardrobe = [
-      garment('top', 'Top', { colors: ['Azul'], styles: ['Minimalista'], formality: 'Formal', seasons: ['Invierno'] }),
-      garment('bottom', 'Bottom', { colors: ['Negro'], styles: ['Minimalista'], formality: 'Formal', seasons: ['Invierno'] }),
-      garment('coat', 'Capa', { colors: ['Negro'], seasons: ['Invierno'], formality: 'Formal' })
+      garment('top', 'Top', { colors: ['Azul'], styles: ['Minimalista'], dressLevels: ['Formal'], seasons: ['Invierno'] }),
+      garment('bottom', 'Bottom', { colors: ['Negro'], styles: ['Minimalista'], dressLevels: ['Formal'], seasons: ['Invierno'] }),
+      garment('coat', 'Capa', { colors: ['Negro'], seasons: ['Invierno'], dressLevels: ['Formal'] })
     ]
-    const base = generateOutfitCandidates(wardrobe, { occasion: 'Casual' })[0]
+    const base = generateOutfitCandidates(wardrobe, { occasion: 'Diario' })[0]
     const coldFormal = generateOutfitCandidates(wardrobe, { occasion: 'Formal', temperatureCelsius: 2 })[0]
     const personalized = generateOutfitCandidates(wardrobe, { occasion: 'Formal', temperatureCelsius: 2 }, {
       preferences: {
         id: 'current',
         preferredColors: ['Azul'],
         preferredStyles: ['Minimalista'],
-        preferredFormality: 'Formal',
+        preferredDressLevel: 'Formal',
         feedbackWeights: {},
         updatedAt: ''
       }
@@ -97,29 +97,46 @@ describe('outfit generator', () => {
     expect(personalized?.scores.preference).toBeGreaterThan(coldFormal?.scores.preference ?? 0)
   })
 
+  it('accepts garments whose range of dress levels reaches the occasion', () => {
+    const wardrobe = [
+      garment('shirt', 'Top', { dressLevels: ['Diario', 'Arreglado', 'Formal'] }),
+      garment('suit-trousers', 'Bottom', { dressLevels: ['Arreglado', 'Formal'] }),
+      garment('jeans', 'Bottom', { dressLevels: ['Diario', 'Arreglado'] }),
+      garment('shoes', 'Calzado', { dressLevels: ['Arreglado', 'Formal'] })
+    ]
+    const formal = generateOutfitCandidates(wardrobe, { occasion: 'Formal' })
+    expect(formal.length).toBeGreaterThan(0)
+    expect(formal.every((candidate) => !candidate.garments.some((item) => item.id === 'jeans'))).toBe(true)
+
+    const daily = generateOutfitCandidates(wardrobe, { occasion: 'Diario' })
+    const withJeans = daily.find((candidate) => candidate.garments.some((item) => item.id === 'jeans'))
+    const withSuit = daily.find((candidate) => candidate.garments.some((item) => item.id === 'suit-trousers'))
+    expect(withJeans!.scores.occasion).toBeGreaterThan(withSuit!.scores.occasion)
+  })
+
   it('lowers a recent exact repeat score without permanently excluding garments', () => {
     const wardrobe = [garment('top', 'Top'), garment('bottom', 'Bottom')]
     const outfit: Outfit = {
       id: 'recent',
       garmentIds: ['top', 'bottom'],
-      occasion: 'Casual',
+      occasion: 'Diario',
       score: 80,
       createdAt: '2026-01-02T00:00:00.000Z',
       favorite: true
     }
-    const first = generateOutfitCandidates(wardrobe, { occasion: 'Casual' })[0]
-    const repeated = generateOutfitCandidates(wardrobe, { occasion: 'Casual' }, { recentOutfits: [outfit] })[0]
+    const first = generateOutfitCandidates(wardrobe, { occasion: 'Diario' })[0]
+    const repeated = generateOutfitCandidates(wardrobe, { occasion: 'Diario' }, { recentOutfits: [outfit] })[0]
     expect(repeated?.scores.rotation).toBeLessThan(first?.scores.rotation ?? 0)
     expect(repeated?.garments.map((item) => item.id).sort()).toEqual(['bottom', 'top'])
   })
 
   it('applies recorded likes and dislikes to future preference scores', () => {
     const wardrobe = [garment('top', 'Top'), garment('bottom', 'Bottom')]
-    const base = generateOutfitCandidates(wardrobe, { occasion: 'Casual' })[0]
-    const liked = generateOutfitCandidates(wardrobe, { occasion: 'Casual' }, {
+    const base = generateOutfitCandidates(wardrobe, { occasion: 'Diario' })[0]
+    const liked = generateOutfitCandidates(wardrobe, { occasion: 'Diario' }, {
       feedback: [{ id: 'like', type: 'like', garmentIds: ['top'], createdAt: '2026-01-02T00:00:00.000Z' }]
     })[0]
-    const disliked = generateOutfitCandidates(wardrobe, { occasion: 'Casual' }, {
+    const disliked = generateOutfitCandidates(wardrobe, { occasion: 'Diario' }, {
       feedback: [{ id: 'dislike', type: 'dislike', garmentIds: ['top'], createdAt: '2026-01-02T00:00:00.000Z' }]
     })[0]
 
@@ -128,8 +145,8 @@ describe('outfit generator', () => {
   })
 
   it('returns no candidates when the wardrobe lacks the required base garments', () => {
-    expect(generateOutfitCandidates([garment('shoe', 'Calzado')], { occasion: 'Casual' })).toEqual([])
-    expect(generateOutfitCandidates([], { occasion: 'Casual' })).toEqual([])
+    expect(generateOutfitCandidates([garment('shoe', 'Calzado')], { occasion: 'Diario' })).toEqual([])
+    expect(generateOutfitCandidates([], { occasion: 'Diario' })).toEqual([])
   })
 
   it('does not accept casual garments for formal outfits or layers in hot-weather outfits', () => {
@@ -141,8 +158,8 @@ describe('outfit generator', () => {
 
   it('uses known wind or cold conditions for thermal fit without inventing item properties', () => {
     const wardrobe = [garment('top', 'Top'), garment('bottom', 'Bottom'), garment('coat', 'Capa')]
-    const mild = generateOutfitCandidates(wardrobe, { occasion: 'Casual' })[0]
-    const windy = generateOutfitCandidates(wardrobe, { occasion: 'Casual', weatherConditions: ['viento'] })[0]
+    const mild = generateOutfitCandidates(wardrobe, { occasion: 'Diario' })[0]
+    const windy = generateOutfitCandidates(wardrobe, { occasion: 'Diario', weatherConditions: ['viento'] })[0]
     expect(windy?.scores.thermal).toBeGreaterThan(mild?.scores.thermal ?? 0)
   })
 
@@ -150,9 +167,9 @@ describe('outfit generator', () => {
     const unknown = [garment('top', 'Top'), garment('bottom', 'Bottom')]
     const matching = [garment('top', 'Top', { pattern: 'Rayas' }), garment('bottom', 'Bottom', { pattern: 'Rayas' })]
     const conflicting = [garment('top', 'Top', { pattern: 'Rayas' }), garment('bottom', 'Bottom', { pattern: 'Cuadros' })]
-    const unknownScore = generateOutfitCandidates(unknown, { occasion: 'Casual' })[0]?.scores.visualStyle ?? 0
-    const matchingScore = generateOutfitCandidates(matching, { occasion: 'Casual' })[0]?.scores.visualStyle ?? 0
-    const conflictingScore = generateOutfitCandidates(conflicting, { occasion: 'Casual' })[0]?.scores.visualStyle ?? 0
+    const unknownScore = generateOutfitCandidates(unknown, { occasion: 'Diario' })[0]?.scores.visualStyle ?? 0
+    const matchingScore = generateOutfitCandidates(matching, { occasion: 'Diario' })[0]?.scores.visualStyle ?? 0
+    const conflictingScore = generateOutfitCandidates(conflicting, { occasion: 'Diario' })[0]?.scores.visualStyle ?? 0
     expect(matchingScore).toBeGreaterThan(unknownScore)
     expect(conflictingScore).toBeLessThan(unknownScore)
   })

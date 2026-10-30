@@ -4,6 +4,8 @@ import {
   attributeApplies,
   CLOTHING_MODEL_ID,
   findDominantColor,
+  labelSize,
+  readGarmentLabel,
   type HeadProbabilities
 } from './clothingAnalyzer'
 
@@ -23,6 +25,8 @@ function makePixels(): ImageData {
   }
   return { data, width, height } as ImageData
 }
+
+const noText = async () => []
 
 function result(probabilities: HeadProbabilities) {
   return { modelVersion: 'heads-test', probabilities }
@@ -62,7 +66,7 @@ describe('clothing analyzer', () => {
       return result(tee)
     })
 
-    const suggestion = await analyzeGarmentImage(image, classify, normalize)
+    const suggestion = await analyzeGarmentImage(image, classify, normalize, noText)
 
     expect(normalize).toHaveBeenCalledWith(image)
     expect(suggestion).toMatchObject({
@@ -91,7 +95,7 @@ describe('clothing analyzer', () => {
       .mockResolvedValueOnce(result(tee))
       .mockResolvedValueOnce(result(jeans))
 
-    const suggestion = await analyzeGarmentImage(images, classify, normalize)
+    const suggestion = await analyzeGarmentImage(images, classify, normalize, noText)
 
     expect(classify).toHaveBeenCalledTimes(2)
     expect(suggestion).toMatchObject({
@@ -109,19 +113,54 @@ describe('clothing analyzer', () => {
     const suggestion = await analyzeGarmentImage(image, async () => result({
       category: { accessory: 0.9, top: 0.1 },
       subcategory: { camiseta: 1 }
-    }), normalize)
+    }), normalize, noText)
     expect(suggestion).toMatchObject({ category: 'Accesorio', subcategory: '' })
     expect(suggestion.unknownAttributes).toContain('subcategory')
+  })
+
+  it('suggests a brand read in any photo and survives a text reader failure', async () => {
+    const images = [new Blob(['side'], { type: 'image/jpeg' }), new Blob(['label'], { type: 'image/jpeg' })]
+    const normalize = async () => ({ blob: new Blob(['normalized']), pixels: makePixels() })
+    const read = vi.fn()
+      .mockResolvedValueOnce([{ text: '42', score: 0.9 }])
+      .mockResolvedValueOnce([{ text: 'N I K E', score: 0.9 }])
+    const suggestion = await analyzeGarmentImage(images, async () => result(tee), normalize, read)
+    expect(suggestion.brand).toMatchObject({ brand: 'Nike', text: 'N I K E' })
+    expect(suggestion.unknownAttributes).not.toContain('brand')
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const failing = vi.fn(async () => { throw new Error('sin OCR') })
+    const withoutText = await analyzeGarmentImage(images, async () => result(tee), normalize, failing)
+    expect(withoutText).toMatchObject({ category: 'Parte superior', subcategory: 'Camiseta' })
+    expect(withoutText.brand).toBeUndefined()
+    expect(failing).toHaveBeenCalledTimes(1) // not retried for every photo
+    warn.mockRestore()
+  })
+
+  it('reads the label photo apart, with only the text reader, and picks the size for the category', async () => {
+    const normalize = vi.fn(async () => ({ blob: new Blob(['label']), pixels: makePixels() }))
+    const read = vi.fn(async () => [
+      { text: 'ZARA', score: 0.97 },
+      { text: 'M', score: 0.95 },
+      { text: 'EUR 40', score: 0.9 },
+      { text: '95% COTTON 5% ELASTANE', score: 0.9 }
+    ])
+    const reading = await readGarmentLabel(new Blob(['label photo']), normalize, read)
+    expect(read).toHaveBeenCalledTimes(1)
+    expect(reading).toMatchObject({ brand: { brand: 'Zara' }, composition: { value: '95 % algodón, 5 % elastano' } })
+    expect(labelSize(reading, 'Parte superior')?.value).toBe('M')
+    expect(labelSize(reading, 'Calzado')?.value).toBe('40')
+    expect(labelSize(undefined, 'Calzado')).toBeUndefined()
   })
 
   it('rejects invalid predictions instead of simulating a result', async () => {
     const image = new Blob(['image'], { type: 'image/jpeg' })
     const normalize = async () => ({ blob: image, pixels: makePixels() })
 
-    await expect(analyzeGarmentImage(image, async () => result({}), normalize)).rejects.toThrow('puntuaciones o etiquetas no válidas')
-    await expect(analyzeGarmentImage(image, async () => result({ category: { top: 1.5 } }), normalize))
+    await expect(analyzeGarmentImage(image, async () => result({}), normalize, noText)).rejects.toThrow('puntuaciones o etiquetas no válidas')
+    await expect(analyzeGarmentImage(image, async () => result({ category: { top: 1.5 } }), normalize, noText))
       .rejects.toThrow('puntuaciones o etiquetas no válidas')
-    await expect(analyzeGarmentImage(image, async () => result({ category: { kimono: 1 } }), normalize))
+    await expect(analyzeGarmentImage(image, async () => result({ category: { kimono: 1 } }), normalize, noText))
       .rejects.toThrow('etiqueta no reconocida')
   })
 })

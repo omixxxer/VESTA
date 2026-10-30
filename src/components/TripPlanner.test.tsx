@@ -13,7 +13,7 @@ function garment(id: string, role: Garment['role']): Garment {
     colors: [],
     seasons: [],
     styles: [],
-    formality: 'Casual',
+    dressLevels: ['Diario'],
     role,
     image: new Blob(['image']),
     thumbnail: new Blob(['thumbnail']),

@@ -23,15 +23,20 @@ def relabel(labels: dict, raw: dict, taxonomy: Taxonomy) -> dict:
         return matches or None
 
     subcategory = taxonomy.match("subcategory", raw.get("subcategory")) or labels["subcategory"]
+    # Dress levels (a list) since app database v6; earlier exports have one formality (Casual → diario…).
+    previous = labels.get("formality")
+    dress_levels = [*(raw.get("dressLevels") or [raw.get("formality")]),
+                    *(previous if isinstance(previous, list) else [previous])]
+    formality = unique("formality", [value for value in dress_levels if value])
     fresh = {
         "category": taxonomy.category_of(subcategory) if subcategory else taxonomy.match("category", raw.get("category")),
         "subcategory": subcategory,
         "pattern": taxonomy.match("pattern", raw.get("pattern")),
-        "formality": taxonomy.match("formality", raw.get("formality")),
         "seasons": unique("seasons", raw.get("seasons", [])),
         "colors": unique("colors", raw.get("colors", [])),
     }
-    return {**labels, **{head: value for head, value in fresh.items() if value is not None}}
+    # formality is always replaced: a single value from an old export is not a valid multi-label value.
+    return {**labels, **{head: value for head, value in fresh.items() if value is not None}, "formality": formality}
 
 
 def prepare(root: Path, archive: Path) -> Path:

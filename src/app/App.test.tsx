@@ -3,10 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { database } from '../db/database'
-import { analyzeGarmentImage } from '../ai/clothingAnalyzer'
+import { analyzeGarmentImage, readGarmentLabel } from '../ai/clothingAnalyzer'
 
-vi.mock('../ai/clothingAnalyzer', () => ({
+// Only the functions that load models are replaced; the rest (e.g. labelSize) are the real ones.
+vi.mock('../ai/clothingAnalyzer', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../ai/clothingAnalyzer')>(),
   analyzeGarmentImage: vi.fn(),
+  readGarmentLabel: vi.fn(),
   MODEL_DOWNLOAD_SIZE: 'test model'
 }))
 
@@ -66,6 +69,7 @@ describe('wardrobe flow', () => {
       unknownAttributes: ['pattern', 'sleeveType', 'neckline', 'fit', 'style', 'formality', 'season'],
       modelId: 'wargoninnovation/wargon-clothing-classifier',
       modelVersion: 'test-revision',
+      calibrated: false,
       analyzedAt: '2026-10-20T12:00:00.000Z'
     })
     const user = userEvent.setup()
@@ -80,6 +84,12 @@ describe('wardrobe flow', () => {
     const nameInput = screen.getByPlaceholderText('p. ej. Camiseta azul · Marca')
     await waitFor(() => expect(nameInput).toHaveValue('Prenda deportiva gris'))
     expect(analyzeGarmentImage).toHaveBeenCalledTimes(1)
+    expect(screen.getByText(/60 % de confianza \(no calibrada\)/)).toBeInTheDocument()
+    // Use is suggested from the type and stops following it once the user changes it.
+    expect(screen.getByRole('checkbox', { name: 'Deportivo' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Formal' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Verano' })).toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: 'Verano' }))
     await user.type(screen.getByLabelText('Marca'), 'Nike')
     expect(nameInput).toHaveValue('Prenda deportiva gris · Nike')
     await user.clear(nameInput)
@@ -90,7 +100,13 @@ describe('wardrobe flow', () => {
     await user.click(screen.getByRole('button', { name: /guardar prenda/i }))
     expect(await screen.findByRole('button', { name: 'Top de entrenamiento' })).toBeInTheDocument()
     expect(await database.garments.toArray()).toEqual([
-      expect.objectContaining({ name: 'Top de entrenamiento', subcategory: 'Prenda deportiva' })
+      expect.objectContaining({
+        name: 'Top de entrenamiento',
+        subcategory: 'Prenda deportiva',
+        seasons: ['Primavera', 'Otoño', 'Invierno'],
+        dressLevels: ['Deportivo'],
+        styles: []
+      })
     ])
   })
 
@@ -149,6 +165,7 @@ describe('wardrobe flow', () => {
       unknownAttributes: ['pattern', 'sleeveType', 'neckline'],
       modelId: 'wargoninnovation/wargon-clothing-classifier',
       modelVersion: 'test-revision',
+      calibrated: true,
       analyzedAt: '2026-10-20T12:00:00.000Z'
     })
     const user = userEvent.setup()
@@ -167,14 +184,16 @@ describe('wardrobe flow', () => {
     expect(screen.getByPlaceholderText('p. ej. Camiseta')).toHaveValue('Camisa')
     await user.type(screen.getByLabelText('Marca'), 'Zara')
     await waitFor(() => expect(screen.getByPlaceholderText('p. ej. Camiseta azul · Marca')).toHaveValue('Camisa blanca · Zara'))
-    await user.clear(screen.getByLabelText(/Colores/))
-    await user.type(screen.getByLabelText(/Colores/), 'Blanco, Azul')
+    // Colours are chips: the suggested one stays, a typed one is added with Enter (a repeated one is ignored).
+    await user.type(screen.getByLabelText('Colores'), 'blanco{Enter}Azul{Enter}')
+    expect(screen.getByRole('button', { name: 'Quitar Azul' })).toBeInTheDocument()
     await waitFor(() => expect(screen.getByPlaceholderText('p. ej. Camiseta azul · Marca')).toHaveValue('Camisa blanca y azul · Zara'))
     await user.click(screen.getByRole('button', { name: /guardar prenda/i }))
 
     expect(await screen.findByRole('button', { name: 'Camisa blanca y azul · Zara' })).toBeInTheDocument()
     const [saved] = await database.garments.toArray()
     expect(saved?.additionalImages).toHaveLength(1)
+    expect(saved?.analysis?.calibrated).toBe(true)
     expect(saved?.analysis?.suggestions.alternatives).toEqual([
       { category: 'Parte superior', subcategory: 'Camisa', score: 0.24 }
     ])
@@ -185,6 +204,49 @@ describe('wardrobe flow', () => {
       expect.any(Blob)
     ]))
   }, 15000)
+
+  it('reads the label photo apart from the garment photos and saves it with the garment', async () => {
+    vi.mocked(analyzeGarmentImage).mockResolvedValue({
+      category: 'Calzado',
+      subcategory: 'Zapatillas',
+      colors: ['Blanco'],
+      alternatives: [],
+      confidenceByAttribute: { category: 0.9, subcategory: 0.8, colors: 0.7 },
+      unknownAttributes: ['size', 'textileComposition'],
+      modelId: 'vesta/dinov2-small-heads',
+      modelVersion: 'heads-test',
+      calibrated: true,
+      analyzedAt: '2026-10-30T12:00:00.000Z'
+    })
+    vi.mocked(readGarmentLabel).mockResolvedValue({
+      lines: [{ text: 'M', score: 0.95 }, { text: 'EUR 42', score: 0.95 }],
+      brand: { brand: 'Nike', score: 0.95, text: 'NIKE' },
+      composition: { value: '100 % piel', text: '100% LEATHER', score: 0.9 }
+    })
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
+    await user.upload(screen.getByLabelText('Seleccionar fotografía de la prenda'), new File(['shoe'], 'zapatilla.png', { type: 'image/png' }))
+    const label = new File(['label'], 'etiqueta.png', { type: 'image/png' })
+    await user.upload(screen.getByLabelText('Seleccionar foto de la etiqueta'), label)
+
+    // A shoe takes the number on the label, not the letter.
+    await waitFor(() => expect(screen.getByLabelText('Talla')).toHaveValue('42'))
+    expect(screen.getByLabelText('Marca')).toHaveValue('Nike')
+    expect(screen.getByLabelText('Composición')).toHaveValue('100 % piel')
+    expect(readGarmentLabel).toHaveBeenCalledWith(label)
+    // The label never goes through the garment classifier.
+    expect(vi.mocked(analyzeGarmentImage).mock.calls.every(([images]) => !(images as Blob[]).includes(label))).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: /guardar prenda/i }))
+    await waitFor(async () => expect(await database.garments.count()).toBe(1))
+    const [saved] = await database.garments.toArray()
+    expect(saved).toMatchObject({ brand: 'Nike', size: '42', composition: '100 % piel', code: 'ZAP-001' })
+    expect(saved?.labelImage).toBeDefined()
+    expect(saved?.additionalImages).toBeUndefined()
+    expect(saved?.analysis?.sourcesByAttribute).toMatchObject({ size: 'paddle-ocr', composition: 'paddle-ocr' })
+  })
 
   it('filters the visible catalogue by category', async () => {
     await database.garments.add({
@@ -198,7 +260,7 @@ describe('wardrobe flow', () => {
       height: 180,
       seasons: [],
       styles: [],
-      formality: 'Casual',
+      dressLevels: ['Diario'],
       role: 'Top',
       image: new Blob(['image']),
       confirmedAttributes: [],

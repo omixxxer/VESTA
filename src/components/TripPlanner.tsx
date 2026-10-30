@@ -46,7 +46,7 @@ export default function TripPlanner({ garments }: { garments: Garment[] }) {
       const recent: Outfit[] = []
       const proposed: TripDay[] = forecast.map((weather) => {
         const candidate = generateOutfitCandidates(garments, {
-          occasion: 'Casual',
+          occasion: 'Diario',
           temperatureCelsius: weather.temperatureCelsius,
           weatherConditions: weather.conditions
         }, { recentOutfits: recent, limit: 1 })[0]

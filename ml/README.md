@@ -98,10 +98,12 @@ python -m vesta_ml.train     # cabezas; guarda en models/<nombre>/
 ## Exportación a la app
 
 ```sh
-python -m vesta_ml.export heads-v4   # escribe public/models/vesta/
+python -m vesta_ml.calibrate heads-v4   # temperaturas por cabeza en validación
+python -m vesta_ml.export heads-v4      # escribe public/models/vesta/
 ```
 
 - [`export.py`](vesta_ml/export.py) exporta backbone y cabezas como un único ONNX (entrada: imagen ya preprocesada, 1×3×224×224; una salida de logits por cabeza entrenada), lo cuantiza a int8 (~26 MB) y escribe `vesta-model.json` con los valores de cada cabeza, el preprocesado y las reglas. Con `--check N` (300 por defecto) compara PyTorch, ONNX fp32 e int8 en imágenes de test.
+- [`calibrate.py`](vesta_ml/calibrate.py) ajusta una temperatura por cabeza de valor único (*temperature scaling*) minimizando la log-verosimilitud en validación, muestra el error de calibración (ECE) antes y después en validación y test, la guarda en `models/<nombre>/calibration.json` y la añade a `vesta-model.json` si describe ese modelo; `export.py` la incluye al exportar. No cambia qué valor gana. En heads-v4 (test): categoría 6,4 % → 0,6 %, subcategoría 11,3 % → 2,8 %, manga 14,6 % → 3,3 %, estampado 26,2 % → 2,0 %; el corte queda igual (5,8 % → 6,5 %, pocas fotos). Las temperaturas son menores que 1: el modelo era demasiado prudente (pesos por clase y dropout).
 - Con heads-v4, int8 pierde como mucho ~1,5 puntos frente a fp32 (categoría 93,5 → 92,0 %, subcategoría 78,5 → 78,0 % en 400 imágenes de test). fp16 no pierde nada pero ocupa 46 MB y el runtime web no garantiza sus operaciones en WebAssembly.
 - La app ([`src/ai/clothingAnalyzer.ts`](../src/ai/clothingAnalyzer.ts)) usa onnxruntime-web (WebAssembly), replica el letterbox en un canvas, promedia las probabilidades de todas las fotos y aplica las mismas reglas que `targets.apply_rules`, leídas de `taxonomy.json`. Rechaza un modelo exportado con otra versión de taxonomía. El modelo se guarda en Cache Storage con su nombre y tamaño, así que una exportación nueva se descarga de nuevo y después funciona sin conexión.
 - Rellena categoría, subcategoría y estampado; la manga y el corte se muestran como información (la prenda no tiene esos campos). Formalidad, temporadas y color no se entrenan todavía: el color sigue saliendo del muestreo de píxeles.

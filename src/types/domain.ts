@@ -8,7 +8,11 @@ export const garmentCategories = [
 ] as const
 
 export type GarmentCategory = (typeof garmentCategories)[number]
-export type Formality = 'Casual' | 'Smart casual' | 'Formal'
+/** How dressed up a garment is; a garment lists every level it suits (a white shirt: Diario, Arreglado, Formal). */
+export const dressLevels = ['Deportivo', 'Diario', 'Arreglado', 'Formal'] as const
+export type DressLevel = (typeof dressLevels)[number]
+/** Single formality saved before database version 6, converted to dress levels by the upgrade. */
+export type LegacyFormality = 'Casual' | 'Smart casual' | 'Formal'
 export type GarmentRole = 'Top' | 'Bottom' | 'Una pieza' | 'Capa' | 'Calzado' | 'Accesorio'
 export type Season = 'Primavera' | 'Verano' | 'Otoño' | 'Invierno'
 export type GarmentAvailability = 'available' | 'laundry' | 'unavailable'
@@ -17,6 +21,8 @@ export type OutfitFeedbackType = 'like' | 'dislike' | 'saved' | 'worn' | 'includ
 export interface GarmentAnalysis {
   modelId: string
   modelVersion: string
+  /** Scores calibrated by temperature scaling; missing in garments analysed before calibration. */
+  calibrated?: boolean
   analyzedAt: string
   suggestions: {
     category: GarmentCategory
@@ -25,21 +31,26 @@ export interface GarmentAnalysis {
     pattern?: string
     sleeve?: string
     fit?: string
+    brand?: string
+    size?: string
+    composition?: string
     alternatives?: Array<{
       category: GarmentCategory
       subcategory: string
       score: number
     }>
   }
-  confidenceByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern', number>>
+  confidenceByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern' | 'brand', number>>
   // wargon-vit and clip-zero-shot only appear in garments analysed by earlier versions of the app.
-  sourcesByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern', 'vesta-dinov2' | 'wargon-vit' | 'clip-zero-shot' | 'local-pixels'>>
+  sourcesByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern' | 'brand' | 'size' | 'composition', 'vesta-dinov2' | 'paddle-ocr' | 'wargon-vit' | 'clip-zero-shot' | 'local-pixels'>>
   unknownAttributes: string[]
   correctedAttributes: string[]
 }
 
 export interface Garment {
   id: string
+  /** Short readable code given when the garment is created (e.g. SUD-002); never changes. */
+  code?: string
   name: string
   category: GarmentCategory
   subcategory: string
@@ -47,14 +58,19 @@ export interface Garment {
   pattern?: string
   brand?: string
   size?: string
+  /** Free text, e.g. "95 % algodón, 5 % elastano". */
+  composition?: string
   notes?: string
   seasons: Season[]
   styles: string[]
-  formality: Formality
+  /** «Estilo» in the interface; empty when unknown. */
+  dressLevels: DressLevel[]
   role: GarmentRole
   availability?: GarmentAvailability
   image: Blob
   additionalImages?: Blob[]
+  /** Close-up of the care label, only read for brand, size and composition; not a garment photo. */
+  labelImage?: Blob
   thumbnail: Blob
   width: number
   height: number
@@ -83,7 +99,7 @@ export interface UserPreferences {
   id: 'current'
   preferredColors: string[]
   preferredStyles: string[]
-  preferredFormality?: Formality
+  preferredDressLevel?: DressLevel
   feedbackWeights: Record<string, number>
   updatedAt: string
 }
