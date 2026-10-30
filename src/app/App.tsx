@@ -7,6 +7,8 @@ import PatternWaves from '../components/PatternWaves.jsx'
 import PillNav from '../components/PillNav.jsx'
 import OutfitGenerator from '../components/OutfitGenerator'
 import TripPlanner from '../components/TripPlanner'
+import WardrobeData from '../components/WardrobeData'
+import { useDriveSync } from '../cloud/useDriveSync'
 import { garmentCategories, type Garment } from '../types/domain'
 
 type Page = 'wardrobe' | 'add' | 'outfits' | 'packing'
@@ -58,8 +60,8 @@ function App() {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('Todas')
   const [reducedMotion, setReducedMotion] = useState(false)
-  const [exporting, setExporting] = useState(false)
-  const [exportMessage, setExportMessage] = useState('')
+  // Lives here, not in the wardrobe screen, so automatic Drive saves also follow changes made in Outfits.
+  const drive = useDriveSync()
 
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -147,28 +149,6 @@ function App() {
     await refreshGarments()
   }, [refreshGarments])
 
-  async function exportTrainingData() {
-    setExporting(true)
-    setExportMessage('')
-    try {
-      // Loaded on demand: the taxonomy and ZIP writer are only needed for this action.
-      const { createTrainingExport } = await import('../ml/datasetExport')
-      const archive = await createTrainingExport(garments)
-      const url = URL.createObjectURL(archive)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `vesta-dataset-${new Date().toISOString().slice(0, 10)}.zip`
-      link.click()
-      setTimeout(() => URL.revokeObjectURL(url), 0)
-      setExportMessage(`Exportadas ${garments.length} ${garments.length === 1 ? 'prenda' : 'prendas'} con sus fotos y etiquetas. El archivo se genera en este dispositivo; no incluye nombres, marcas, tallas ni notas.`)
-    } catch (exportError) {
-      console.error('No se pudo exportar el dataset:', exportError)
-      setExportMessage('No se pudo generar la exportación. Comprueba el espacio disponible e inténtalo de nuevo.')
-    } finally {
-      setExporting(false)
-    }
-  }
-
   function handleNavigation(_item: PillItem, index: number, event: MouseEvent<HTMLAnchorElement | HTMLButtonElement>) {
     event.preventDefault()
     const next = (['wardrobe', 'outfits', 'packing'] as const)[index]
@@ -217,6 +197,8 @@ function App() {
           {error && <div className="alert" role="alert">{error}</div>}
           {page === 'wardrobe' && (
             <section aria-labelledby="wardrobe-title">
+              <WardrobeData garments={garments} onImported={refreshGarments} drive={drive}>
+                {({ menu, notices }) => <>
               <div className="page-heading">
                 <div>
                   <p className="eyebrow">TU COLECCIÓN PERSONAL</p>
@@ -224,15 +206,13 @@ function App() {
                   <p className="page-intro">Cada prenda cuenta una historia. Aquí empieza la tuya.</p>
                 </div>
                 <div className="page-actions">
-                  {garments.length > 0 && (
-                    <button className="button button-outline" type="button" onClick={() => void exportTrainingData()} disabled={exporting}>
-                      {exporting ? 'Preparando exportación…' : 'Exportar datos de entrenamiento'}
-                    </button>
-                  )}
+                  {menu}
                   <button className="button button-dark" type="button" onClick={() => setPage('add')}>＋ Añadir prenda</button>
                 </div>
               </div>
-              {exportMessage && <p className="export-note" role="status">{exportMessage}</p>}
+              {notices}
+                </>}
+              </WardrobeData>
 
               <div className="wardrobe-toolbar">
                 <span className="item-count">{garments.length} {garments.length === 1 ? 'PRENDA' : 'PRENDAS'}</span>

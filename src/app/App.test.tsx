@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { database } from '../db/database'
 import { analyzeGarmentImage, readGarmentLabel } from '../ai/clothingAnalyzer'
+import { importWardrobeBackup, readWardrobeBackup } from '../db/wardrobeBackup'
 
 // Only the functions that load models are replaced; the rest (e.g. labelSize) are the real ones.
 vi.mock('../ai/clothingAnalyzer', async (importOriginal) => ({
@@ -31,7 +32,15 @@ vi.mock('../components/Masonry.jsx', () => ({
 
 vi.mock('../components/PatternWaves.jsx', () => ({ default: () => null }))
 
+// Reading and writing backups is tested in wardrobeBackup.test.ts with real Blobs; here only the flow.
+vi.mock('../db/wardrobeBackup', () => ({
+  readWardrobeBackup: vi.fn(),
+  importWardrobeBackup: vi.fn(),
+  createWardrobeBackup: vi.fn()
+}))
+
 vi.mock('../db/imageProcessing', () => ({
+  reducePhoto: async (photo: Blob) => photo,
   createThumbnail: async () => ({
     thumbnail: new Blob(['thumbnail'], { type: 'image/jpeg' }),
     width: 120,
@@ -46,6 +55,32 @@ afterEach(async () => {
 })
 
 describe('wardrobe flow', () => {
+  it('imports a backup, letting the user merge it with the current wardrobe', async () => {
+    await database.garments.add({
+      id: 'local', name: 'Camisa', category: 'Parte superior', subcategory: 'Camisa', colors: [], seasons: [], styles: [],
+      dressLevels: [], role: 'Top', image: new Blob(['image']), thumbnail: new Blob(['thumbnail']), width: 10, height: 10,
+      confirmedAttributes: [], suggestedAttributes: [], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z'
+    })
+    vi.mocked(readWardrobeBackup).mockResolvedValue({
+      exportedAt: '2026-10-30T12:00:00.000Z', garments: [], outfits: [], preferences: [], outfitFeedback: [], trendPacks: [],
+      garmentCodeCounters: []
+    })
+    vi.mocked(importWardrobeBackup).mockResolvedValue({ added: 2, updated: 1, unchanged: 0, recoded: 1, outfits: 3 })
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('button', { name: 'Camisa' })
+
+    await user.click(screen.getByText('Datos'))
+    expect(screen.getByRole('button', { name: /exportar copia del armario/i })).toBeEnabled()
+    await user.upload(screen.getByLabelText('Seleccionar copia del armario'), new File(['zip'], 'vesta-armario.zip', { type: 'application/zip' }))
+    expect(await screen.findByText(/copia del 30 de octubre de 2026/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Combinar con mi armario' }))
+
+    expect(importWardrobeBackup).toHaveBeenCalledWith(expect.objectContaining({ exportedAt: '2026-10-30T12:00:00.000Z' }), 'merge')
+    expect(await screen.findByText(/Copia importada: 2 prendas añadidas, 1 actualizada, 3 outfits\. 1 prenda ha recibido un código nuevo/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Combinar con mi armario' })).not.toBeInTheDocument()
+  })
+
   it('keeps adding garments inside the wardrobe flow, not in bottom navigation', async () => {
     const user = userEvent.setup()
     render(<App />)

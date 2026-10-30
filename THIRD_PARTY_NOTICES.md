@@ -40,6 +40,7 @@ Las herramientas de desarrollo y pruebas (Vite, TypeScript, Vitest, Testing Libr
 ## Servicios externos
 
 - [Open-Meteo](https://open-meteo.com): previsión y geocodificación, solo cuando el usuario consulta el tiempo. Datos bajo CC BY 4.0, atribución a Open-Meteo.com.
+- [Google Drive API](https://developers.google.com/drive) e inicio de sesión de Google: solo si el usuario guarda o restaura su copia en su propio Drive. Sujeto a las condiciones de Google; la app no incluye código de Google.
 
 ## Licencia Apache-2.0
 

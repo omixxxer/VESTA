@@ -1,6 +1,6 @@
 import type { Garment } from '../types/domain'
 import { categoryIdForLabel, categoryOfSubcategory, matchLabel, TAXONOMY_VERSION, type LabelHead } from './taxonomy'
-import { createZip, type ZipEntry } from './zip'
+import { blobBytes, createZip, type ZipEntry } from './zip'
 
 export const EXPORT_FORMAT = 'vesta-training-export'
 
@@ -67,16 +67,6 @@ export function toTrainingRecord(garment: Garment): TrainingRecord {
       dressLevels: garment.dressLevels
     }
   }
-}
-
-async function blobBytes(blob: Blob): Promise<Uint8Array> {
-  if (typeof blob.arrayBuffer === 'function') return new Uint8Array(await blob.arrayBuffer())
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsArrayBuffer(blob)
-  })
 }
 
 export async function createTrainingExport(garments: Garment[], exportedAt = new Date()): Promise<Blob> {
