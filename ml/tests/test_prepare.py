@@ -42,7 +42,10 @@ class TaxonomyTest(unittest.TestCase):
         relabeled = vesta_export.relabel(labels, raw, self.taxonomy)
         self.assertEqual(relabeled["subcategory"], "zuecos")
         self.assertEqual(relabeled["colors"], ["azul"])
-        self.assertEqual(relabeled["formality"], "casual")
+        self.assertEqual(relabeled["formality"], ["diario"])
+        newer = vesta_export.relabel({**labels, "formality": ["diario", "arreglado"]},
+                                     {**raw, "dressLevels": ["Diario", "Arreglado"]}, self.taxonomy)
+        self.assertEqual(newer["formality"], ["diario", "arreglado"])
         self.assertIsNone(relabeled["seasons"])
 
     def test_wargon_labels_from_existing_garments_still_map(self):
@@ -236,7 +239,8 @@ class VestaExportTest(unittest.TestCase):
                 bundle.writestr("images/g1-0.png", image.getvalue())
             manifest = vesta_export.prepare(root, archive)
             [record] = [json.loads(line) for line in manifest.read_text(encoding="utf-8").splitlines()]
-            self.assertEqual(record["labels"], {**labels, "fit": None})  # a v1 export has no fit head
+            # A v1 export has no fit head, and its single formality becomes a list of dress levels.
+            self.assertEqual(record["labels"], {**labels, "fit": None, "formality": ["diario"]})
             self.assertEqual(record["group"], "vesta:g1")
             self.assertTrue((root / record["image"]).exists())
 

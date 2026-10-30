@@ -14,7 +14,7 @@ function makeGarment(id: string, role: Garment['role']): Garment {
     colors: ['Azul'],
     seasons: [],
     styles: [],
-    formality: 'Casual',
+    dressLevels: ['Diario'],
     role,
     image: new Blob(['photo'], { type: 'image/png' }),
     thumbnail: new Blob(['thumbnail'], { type: 'image/png' }),
@@ -47,7 +47,7 @@ describe('OutfitGenerator', () => {
     const rendered = render(<OutfitGenerator {...props} />)
 
     await user.click(screen.getByRole('button', { name: 'Generar outfits' }))
-    expect(await screen.findByRole('heading', { name: /Casual · \d+(?:\.\d+)?\/100/ })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Diario · \d+(?:\.\d+)?\/100/ })).toBeInTheDocument()
     expect((await screen.findAllByRole('img')).map((image) => image.getAttribute('alt'))).toEqual(['shirt', 'trousers'])
 
     await user.click(screen.getByRole('button', { name: 'Guardar' }))

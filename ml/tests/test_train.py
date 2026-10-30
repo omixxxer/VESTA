@@ -157,5 +157,22 @@ class DisagreementTest(unittest.TestCase):
         self.assertEqual([value for value, _ in found[0][1]], ["camisa", "blusa", "polo"])
 
 
+class CalibrationTest(unittest.TestCase):
+    def test_temperature_softens_overconfident_logits_and_keeps_the_winner(self):
+        from vesta_ml.calibrate import calibration_error, fit_temperature, softmax
+
+        rng = np.random.default_rng(0)
+        targets = rng.integers(0, 3, 2000)
+        logits = rng.normal(0, 1, (2000, 3))
+        logits[np.arange(2000), targets] += 1.0
+        overconfident = logits * 5
+        temperature = fit_temperature(overconfident, targets)
+        self.assertGreater(temperature, 3)
+        self.assertLess(calibration_error(softmax(overconfident, temperature), targets),
+                        calibration_error(softmax(overconfident), targets) / 2)
+        self.assertTrue((softmax(overconfident, temperature).argmax(1) == overconfident.argmax(1)).all())
+        self.assertEqual(fit_temperature(overconfident[:0], targets[:0]), 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()

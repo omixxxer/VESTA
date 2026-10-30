@@ -13,7 +13,7 @@ export interface TrainingRecord {
   /** How each label was obtained, so training can down-weight unreviewed model suggestions. */
   review: Partial<Record<LabelHead, ReviewState>>
   /** Original text, kept so unmatched values can be added to the taxonomy later. */
-  raw: { category: string; subcategory: string; pattern?: string; colors: string[]; seasons: string[]; formality: string }
+  raw: { category: string; subcategory: string; pattern?: string; colors: string[]; seasons: string[]; dressLevels: string[] }
 }
 
 const extensions: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
@@ -46,7 +46,7 @@ export function toTrainingRecord(garment: Garment): TrainingRecord {
       sleeve: null,
       fit: null,
       pattern: matchLabel('pattern', garment.pattern),
-      formality: matchLabel('formality', garment.formality),
+      formality: uniqueMatches('formality', garment.dressLevels),
       seasons: uniqueMatches('seasons', garment.seasons),
       colors: uniqueMatches('colors', garment.colors)
     },
@@ -64,7 +64,7 @@ export function toTrainingRecord(garment: Garment): TrainingRecord {
       ...(garment.pattern ? { pattern: garment.pattern } : {}),
       colors: garment.colors,
       seasons: garment.seasons,
-      formality: garment.formality
+      dressLevels: garment.dressLevels
     }
   }
 }

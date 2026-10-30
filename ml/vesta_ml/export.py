@@ -3,7 +3,8 @@
 Un único grafo: imagen preprocesada (1×3×224×224, letterbox y normalización ya hechos) → DINOv2 → CLS + media de
 parches → cabezas → logits de cada cabeza. Se cuantiza a int8 (pesos) y se guarda en public/models/vesta/ junto a
 vesta-model.json (valores de cada cabeza, preprocesado y reglas), que la app lee para interpretar las salidas.
-Con --check compara PyTorch, ONNX fp32 y ONNX int8 en imágenes de test.
+Con --check compara PyTorch, ONNX fp32 y ONNX int8 en imágenes de test. Si existe calibration.json (vesta_ml.calibrate),
+cada cabeza lleva su temperatura.
 """
 
 from __future__ import annotations
@@ -109,6 +110,8 @@ def main() -> None:
         print(f"Comparando con PyTorch en {len(test[::step][:arguments.check])} imágenes de test…")
         check(model, {"fp32": full, "int8": quantized}, test[::step][:arguments.check], root)
 
+    calibration = root / "models" / arguments.model / "calibration.json"
+    temperatures = json.loads(calibration.read_text(encoding="utf-8"))["temperatures"] if calibration.exists() else {}
     arguments.output.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(quantized, arguments.output / MODEL_FILE)
     description = {
@@ -117,7 +120,8 @@ def main() -> None:
         "taxonomyVersion": metadata["taxonomyVersion"],
         "preprocessing": metadata["preprocessing"],
         "input": "pixel_values",
-        "heads": [{"name": spec.name, "multiLabel": spec.multi_label, "values": spec.values} for spec in specs],
+        "heads": [{"name": spec.name, "multiLabel": spec.multi_label, "values": spec.values,
+                   **({"temperature": temperatures[spec.name]} if spec.name in temperatures else {})} for spec in specs],
         "rules": metadata["rules"],
         "file": MODEL_FILE,
         "bytes": quantized.stat().st_size,

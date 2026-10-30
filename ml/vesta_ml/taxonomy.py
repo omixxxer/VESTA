@@ -14,7 +14,7 @@ TAXONOMY_PATH = ML_ROOT / "taxonomy.json"
 SOURCE_MAPPINGS_PATH = ML_ROOT / "source_mappings.json"
 
 LABEL_HEADS = ("category", "subcategory", "sleeve", "fit", "pattern", "formality", "seasons", "colors")
-MULTI_LABEL_HEADS = ("seasons", "colors")
+MULTI_LABEL_HEADS = ("formality", "seasons", "colors")
 
 
 def normalize(text: str) -> str:

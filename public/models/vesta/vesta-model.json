@@ -36,7 +36,8 @@
         "outerwear",
         "footwear",
         "accessory"
-      ]
+      ],
+      "temperature": 0.6699
     },
     {
       "name": "subcategory",
@@ -83,7 +84,8 @@
         "gafas",
         "corbata",
         "reloj"
-      ]
+      ],
+      "temperature": 0.6909
     },
     {
       "name": "sleeve",
@@ -93,7 +95,8 @@
         "corta",
         "tres-cuartos",
         "larga"
-      ]
+      ],
+      "temperature": 0.5762
     },
     {
       "name": "fit",
@@ -103,7 +106,8 @@
         "recto",
         "ancho",
         "campana"
-      ]
+      ],
+      "temperature": 1.1037
     },
     {
       "name": "pattern",
@@ -119,7 +123,8 @@
         "geometrico",
         "grafico",
         "otro"
-      ]
+      ],
+      "temperature": 0.5147
     }
   ],
   "rules": {

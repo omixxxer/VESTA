@@ -1,6 +1,6 @@
-import type { Garment, Outfit, OutfitFeedback, OutfitFeedbackType, UserPreferences } from '../types/domain'
+import { dressLevels, type DressLevel, type Garment, type Outfit, type OutfitFeedback, type OutfitFeedbackType, type UserPreferences } from '../types/domain'
 
-export type OutfitTemplate = 'Casual' | 'Smart casual' | 'Formal' | 'Deportivo' | 'Frío y capas' | 'Calor y pocas capas'
+export type OutfitTemplate = 'Diario' | 'Arreglado' | 'Formal' | 'Deportivo' | 'Frío y capas' | 'Calor y pocas capas'
 
 export interface OutfitContext {
   occasion: string
@@ -48,11 +48,11 @@ export const OUTFIT_SCORE_WEIGHTS: OutfitScoreWeights = {
   rotation: 0.12
 } as const
 
-const TEMPLATE_FORMALITY: Record<OutfitTemplate, string | undefined> = {
-  Casual: 'Casual',
-  'Smart casual': 'Smart casual',
+const TEMPLATE_LEVEL: Record<OutfitTemplate, DressLevel | undefined> = {
+  Diario: 'Diario',
+  Arreglado: 'Arreglado',
   Formal: 'Formal',
-  Deportivo: undefined,
+  Deportivo: 'Deportivo',
   'Frío y capas': undefined,
   'Calor y pocas capas': undefined
 }
@@ -124,11 +124,17 @@ function patternCompatibility(garments: Garment[]) {
   return distinctPatterns.size === 1 ? 92 : 58
 }
 
+/** 100 when the garment suits the level, 62 one step away (Diario for Arreglado), 35 further; 72 when unknown. */
+function levelFit(garment: Garment, target: DressLevel) {
+  if (!garment.dressLevels.length) return 72
+  const distance = Math.min(...garment.dressLevels.map((level) => Math.abs(dressLevels.indexOf(level) - dressLevels.indexOf(target))))
+  return distance === 0 ? 100 : distance === 1 ? 62 : 35
+}
+
 function occasionScore(garments: Garment[], context: OutfitContext) {
-  const formalities = garments.map((garment) => garment.formality)
-  const target = TEMPLATE_FORMALITY[context.occasion as OutfitTemplate]
-  const formalFit = target && formalities.length
-    ? formalities.reduce((sum, value) => sum + (value === target ? 100 : value === 'Smart casual' || target === 'Smart casual' ? 62 : 35), 0) / formalities.length
+  const target = TEMPLATE_LEVEL[context.occasion as OutfitTemplate]
+  const formalFit = target && garments.length
+    ? garments.reduce((sum, garment) => sum + levelFit(garment, target), 0) / garments.length
     : 72
   const occasionTerms = normalize(context.occasion)
   const styleMatches = garments.filter((garment) =>
@@ -184,7 +190,9 @@ function preferenceScore(garments: Garment[], preferences?: UserPreferences, fee
       const styleMatch = garment.styles.some((style) => preferences.preferredStyles.some((preferred) => normalize(style) === normalize(preferred)))
       score += styleMatch ? 5 : -2
     }
-    if (preferences.preferredFormality) score += garment.formality === preferences.preferredFormality ? 4 : -2
+    if (preferences.preferredDressLevel && garment.dressLevels.length) {
+      score += garment.dressLevels.includes(preferences.preferredDressLevel) ? 4 : -2
+    }
   }
   return Math.max(0, Math.min(100, score))
 }
@@ -260,7 +268,8 @@ export function generateOutfitCandidates(
     if (checked >= MAX_CANDIDATE_COMBINATIONS) return
     checked += 1
     const selected = [...base, layer, shoe, accessory].filter((item): item is Garment => Boolean(item))
-    if (context.occasion === 'Formal' && selected.some((item) => item.formality !== 'Formal')) return
+    // Every garment must suit a formal look; one whose levels are unknown is not ruled out.
+    if (context.occasion === 'Formal' && selected.some((item) => item.dressLevels.length && !item.dressLevels.includes('Formal'))) return
     if ((isWarmOutfit(context) || context.occasion === 'Calor y pocas capas') && selected.some((item) => item.role === 'Capa')) return
     if ([...includedIds].some((id) => !selected.some((garment) => garment.id === id))) return
     const key = selected.map((garment) => garment.id).sort().join('|')

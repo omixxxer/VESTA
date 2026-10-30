@@ -1,13 +1,14 @@
-import wasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url'
-import wasmModuleUrl from 'onnxruntime-web/ort-wasm-simd-threaded.mjs?url'
 import { TAXONOMY_VERSION, taxonomy } from '../ml/taxonomy'
 import type { GarmentCategory } from '../types/domain'
+import { findBrand, type BrandMatch } from './brands'
+import { findComposition, findSize, type LabelValue } from './labelParser'
+import { fetchDescription, fetchModelFile, loadOrt } from './onnxRuntime'
+import { readText, type TextLine } from './textReader'
 
 // Own model trained in ml/ (DINOv2-small + heads); exported with python -m vesta_ml.export.
 export const CLOTHING_MODEL_ID = 'vesta/dinov2-small-heads'
-export const MODEL_DOWNLOAD_SIZE = 'aprox. 25,6 MB (ONNX int8)'
+export const MODEL_DOWNLOAD_SIZE = 'aprox. 38,5 MB (clasificador de 25,6 MB y lector de texto de 12,9 MB)'
 const MODEL_BASE = `${import.meta.env.BASE_URL}models/vesta/`
-const MODEL_CACHE = 'vesta-model'
 
 /** Probabilities per head (category, subcategory, sleeve, fit, pattern), keyed by taxonomy id. */
 export type HeadProbabilities = Record<string, Record<string, number>>
@@ -25,15 +26,19 @@ export interface ClothingAnalysisSuggestion {
   pattern?: AttributeSuggestion
   sleeve?: AttributeSuggestion
   fit?: AttributeSuggestion
+  /** Brand found in text visible in the photos (on-device OCR); logos without lettering are not recognised. */
+  brand?: BrandMatch
   alternatives: Array<{
     category: GarmentCategory
     subcategory: string
     score: number
   }>
-  confidenceByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern', number>>
+  confidenceByAttribute: Partial<Record<'category' | 'subcategory' | 'colors' | 'pattern' | 'brand', number>>
   unknownAttributes: string[]
   modelId: string
   modelVersion: string
+  /** Scores adjusted by temperature scaling so that 80 % is right about 8 times in 10 (vesta_ml.calibrate). */
+  calibrated: boolean
   analyzedAt: string
 }
 
@@ -43,7 +48,8 @@ interface ModelDescription {
   taxonomyVersion: number
   preprocessing: { inputSize: number; padColor: number[]; mean: number[]; std: number[] }
   input: string
-  heads: Array<{ name: string; multiLabel: boolean; values: string[] }>
+  /** temperature divides the logits before the softmax; missing in models exported before calibration. */
+  heads: Array<{ name: string; multiLabel: boolean; values: string[]; temperature?: number }>
   file: string
   bytes: number
 }
@@ -56,6 +62,7 @@ interface NormalizedImage {
 interface Classification {
   modelVersion: string
   probabilities: HeadProbabilities
+  calibrated?: boolean
 }
 
 interface RankedPair {
@@ -67,6 +74,7 @@ interface RankedPair {
 
 type Classifier = (image: Blob) => Promise<Classification>
 type ImageNormalizer = (image: Blob) => Promise<NormalizedImage>
+type TextReader = (image: Blob) => Promise<TextLine[]>
 
 let classifierPromise: Promise<Classifier> | undefined
 
@@ -230,8 +238,8 @@ async function preprocess(image: Blob, settings: ModelDescription['preprocessing
   }
 }
 
-function softmax(logits: ArrayLike<number>): number[] {
-  const values = Array.from(logits)
+function softmax(logits: ArrayLike<number>, temperature = 1): number[] {
+  const values = Array.from(logits, (value) => value / temperature)
   if (!values.length || values.some((value) => !Number.isFinite(value))) {
     throw new Error('El modelo devolvió puntuaciones de clasificación no válidas.')
   }
@@ -241,30 +249,8 @@ function softmax(logits: ArrayLike<number>): number[] {
   return exponentials.map((value) => value / total)
 }
 
-/** The model file is cached by name and size, so a new export is downloaded again and works offline afterwards. */
-async function fetchModelFile(url: string): Promise<ArrayBuffer> {
-  const cache = typeof caches === 'undefined' ? undefined : await caches.open(MODEL_CACHE).catch(() => undefined)
-  const cached = await cache?.match(url)
-  if (cached) return cached.arrayBuffer()
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`No se pudo descargar el modelo (${response.status}).`)
-  await cache?.put(url, response.clone()).catch(() => undefined)
-  return response.arrayBuffer()
-}
-
-async function fetchDescription(): Promise<ModelDescription> {
-  const url = `${MODEL_BASE}vesta-model.json`
-  const cache = typeof caches === 'undefined' ? undefined : await caches.open(MODEL_CACHE).catch(() => undefined)
-  let response: Response | undefined
-  try {
-    response = await fetch(url, { cache: 'no-cache' })
-    if (response.ok) await cache?.put(url, response.clone()).catch(() => undefined)
-  } catch {
-    response = undefined
-  }
-  if (!response?.ok) response = await cache?.match(url)
-  if (!response?.ok) throw new Error('No se pudo cargar la descripción del modelo.')
-  const description = await response.json() as ModelDescription
+async function loadDescription(): Promise<ModelDescription> {
+  const description = await fetchDescription<ModelDescription>(`${MODEL_BASE}vesta-model.json`)
   if (description.format !== 'vesta-model') throw new Error('La descripción del modelo no es válida.')
   if (description.taxonomyVersion !== TAXONOMY_VERSION) {
     throw new Error(`El modelo usa la taxonomía v${description.taxonomyVersion} y la app la v${TAXONOMY_VERSION}.`)
@@ -275,8 +261,8 @@ async function fetchDescription(): Promise<ModelDescription> {
 async function loadClassifier(): Promise<Classifier> {
   if (!classifierPromise) {
     const pending = (async (): Promise<Classifier> => {
-      const [ort, description] = await Promise.all([import('onnxruntime-web/wasm'), fetchDescription()])
-      ort.env.wasm.wasmPaths = { wasm: wasmUrl, mjs: wasmModuleUrl }
+      const [ort, description] = await Promise.all([loadOrt(), loadDescription()])
+      // Cached by name and size, so a new export is downloaded again.
       const model = await fetchModelFile(`${MODEL_BASE}${description.file}?v=${description.name}-${description.bytes}`)
       const session = await ort.InferenceSession.create(model, { executionProviders: ['wasm'] })
       const heads = description.heads.filter((head) => !head.multiLabel)
@@ -288,10 +274,10 @@ async function loadClassifier(): Promise<Classifier> {
         for (const head of heads) {
           const output = outputs[head.name]
           if (!output) throw new Error(`El modelo no devolvió la cabeza ${head.name}.`)
-          const scores = softmax(output.data as Float32Array)
+          const scores = softmax(output.data as Float32Array, head.temperature)
           probabilities[head.name] = Object.fromEntries(head.values.map((value, index) => [value, scores[index] ?? 0]))
         }
-        return { modelVersion: description.name, probabilities }
+        return { modelVersion: description.name, probabilities, calibrated: heads.every((head) => head.temperature !== undefined) }
       }
     })()
     classifierPromise = pending.catch((error: unknown) => {
@@ -334,26 +320,41 @@ function attributeSuggestion(head: string, scores: Record<string, number> | unde
 export async function analyzeGarmentImage(
   images: Blob | Blob[],
   classify: Classifier = classifyLocally,
-  normalize: ImageNormalizer = normalizeImage
+  normalize: ImageNormalizer = normalizeImage,
+  read: TextReader = readText
 ): Promise<ClothingAnalysisSuggestion> {
   const imageList = Array.isArray(images) ? images : [images]
   if (!imageList.length || imageList.some((image) => image.size === 0)) {
     throw new Error('Añade al menos una imagen válida.')
   }
 
-  // Probabilities of every photo are averaged per head; colours are counted per photo.
+  // Probabilities of every photo are averaged per head; colours are counted per photo. The care label has its own
+  // field and is read apart (readGarmentLabel), so it never weighs on these results.
   const averaged: HeadProbabilities = {}
   const colorCounts = new Map<string, { count: number; confidence: number }>()
+  const textLines: TextLine[] = []
+  let textFailed = false
   let modelVersion = ''
+  let calibrated = true
   for (const image of imageList) {
     const normalized = await normalize(image)
-    const result = await classify(normalized.blob)
+    // Reading text is a bonus: if it fails the rest of the suggestion still stands, just without a brand.
+    const [result, lines] = await Promise.all([
+      classify(normalized.blob),
+      textFailed ? Promise.resolve([]) : read(normalized.blob).catch((error: unknown) => {
+        console.warn('No se pudo leer el texto de la foto:', error)
+        textFailed = true
+        return []
+      })
+    ])
+    textLines.push(...lines)
     if (!result.probabilities.category || Object.values(result.probabilities).some((scores) =>
       Object.values(scores).some((score) => !Number.isFinite(score) || score < 0 || score > 1)
     )) {
       throw new Error('El clasificador devolvió puntuaciones o etiquetas no válidas.')
     }
     modelVersion = result.modelVersion
+    calibrated &&= result.calibrated === true
     for (const [head, scores] of Object.entries(result.probabilities)) {
       const total = averaged[head] ??= {}
       for (const [value, score] of Object.entries(scores)) total[value] = (total[value] ?? 0) + score / imageList.length
@@ -395,11 +396,13 @@ export async function analyzeGarmentImage(
     .sort((left, right) => right[1].count - left[1].count || right[1].confidence - left[1].confidence)
     .slice(0, 3)
   const dominantColor = colors[0]
+  const brand = findBrand(textLines)
   return {
     category: categoryLabels.get(category)!,
     subcategory: labelOf(top.subcategory),
     colors: colors.map(([color]) => color),
     ...attributes,
+    ...(brand ? { brand } : {}),
     alternatives: ranked.filter((entry) => entry !== top).slice(0, 3).map((entry) => ({
       category: categoryLabels.get(entry.category)!,
       subcategory: labelOf(entry.subcategory),
@@ -409,6 +412,7 @@ export async function analyzeGarmentImage(
       category: categoryScore,
       ...(top.subcategory ? { subcategory: top.conditional } : {}),
       ...(attributes.pattern ? { pattern: attributes.pattern.score } : {}),
+      ...(brand ? { brand: brand.score } : {}),
       ...(dominantColor ? { colors: dominantColor[1].confidence / dominantColor[1].count } : {})
     },
     unknownAttributes: [
@@ -419,7 +423,8 @@ export async function analyzeGarmentImage(
       'style',
       'formality',
       'season',
-      'brand',
+      ...(!brand ? ['brand'] : []),
+      // Read from the label photo, which is analysed apart.
       'size',
       'textileComposition',
       'multipleItems',
@@ -427,6 +432,34 @@ export async function analyzeGarmentImage(
     ],
     modelId: CLOTHING_MODEL_ID,
     modelVersion,
+    calibrated,
     analyzedAt: new Date().toISOString()
   }
+}
+
+export interface LabelReading {
+  /** Every line read, so the size can be chosen again when the category changes (findSize depends on it). */
+  lines: TextLine[]
+  brand?: BrandMatch
+  composition?: LabelValue
+}
+
+/** Reads the care label photo: only text, never the garment classifier, so it does not affect the type or colour. */
+export async function readGarmentLabel(
+  image: Blob,
+  normalize: ImageNormalizer = normalizeImage,
+  read: TextReader = readText
+): Promise<LabelReading> {
+  if (image.size === 0) throw new Error('La foto de la etiqueta está vacía.')
+  const lines = await read((await normalize(image)).blob)
+  const brand = findBrand(lines)
+  const composition = findComposition(lines)
+  return { lines, ...(brand ? { brand } : {}), ...(composition ? { composition } : {}) }
+}
+
+/** The size on a label for a garment category (the category label shown in the app). */
+export function labelSize(reading: LabelReading | undefined, category: GarmentCategory): LabelValue | undefined {
+  if (!reading) return undefined
+  const categoryId = taxonomy.categories.find((entry) => entry.label === category)?.id
+  return findSize(reading.lines, categoryId)
 }

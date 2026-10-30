@@ -15,7 +15,7 @@ const makeGarment = (overrides: Partial<Garment> = {}): Garment => ({
   notes: 'Nota personal',
   seasons: ['Otoño', 'Invierno'],
   styles: ['Casual'],
-  formality: 'Smart casual',
+  dressLevels: ['Arreglado'],
   role: 'Capa',
   image: new Blob(['principal'], { type: 'image/jpeg' }),
   additionalImages: [new Blob(['detalle'], { type: 'image/png' })],
@@ -93,7 +93,7 @@ describe('training export', () => {
       sleeve: null,
       fit: null,
       pattern: 'rayas',
-      formality: 'smart-casual',
+      formality: ['arreglado'],
       seasons: ['otono', 'invierno'],
       colors: ['azul-marino', 'gris']
     })
