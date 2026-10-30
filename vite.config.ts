@@ -29,6 +29,8 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico,png,woff2}'],
         navigateFallback: 'index.html',
+        // The Google sign-in return page must load itself, never the app shell.
+        navigateFallbackDenylist: [/^\/oauth\//],
         runtimeCaching: [
           {
             urlPattern: /\.(?:wasm|mjs)$/,

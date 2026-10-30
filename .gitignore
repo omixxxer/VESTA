@@ -8,3 +8,7 @@ __pycache__/
 
 # Third-party product photos used only for local testing; not redistributable.
 public/test-photos/
+
+# Local settings such as VITE_GOOGLE_CLIENT_ID.
+.env.local
+.env.*.local

@@ -8,7 +8,7 @@ import {
   type LabelReading
 } from '../ai/clothingAnalyzer'
 import { suggestUsage } from '../ai/usageRules'
-import { createThumbnail } from '../db/imageProcessing'
+import { createThumbnail, reducePhoto } from '../db/imageProcessing'
 import { taxonomy } from '../ml/taxonomy'
 import {
   dressLevels,
@@ -422,14 +422,16 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setFormError('')
-    const [image, ...additionalImages] = photos
-    if (!image) {
+    if (!photos.length) {
       setFormError('Añade una fotografía para guardar la prenda.')
       return
     }
 
     setSaving(true)
     try {
+      // Stored photos are reduced (≤ 2048 px); photos already saved are not processed again.
+      const [image, ...additionalImages] = (imageChanged ? await Promise.all(photos.map(reducePhoto)) : photos) as [Blob, ...Blob[]]
+      const labelImage = labelPhoto && labelPhoto !== garment?.labelImage ? await reducePhoto(labelPhoto) : labelPhoto
       const processedImage = imageChanged || !garment || !garment.thumbnail || !garment.width || !garment.height
         ? await createThumbnail(image)
         : {
@@ -518,7 +520,7 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
         availability: garment?.availability,
         image,
         ...(additionalImages.length ? { additionalImages } : {}),
-        ...(labelPhoto ? { labelImage: labelPhoto } : {}),
+        ...(labelImage ? { labelImage } : {}),
         thumbnail: processedImage.thumbnail,
         width: processedImage.width,
         height: processedImage.height,

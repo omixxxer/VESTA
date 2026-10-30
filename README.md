@@ -9,6 +9,7 @@ Armario virtual *local-first*: catalogas tus prendas con una foto, generas outfi
 ### Armario
 - Galería tipo *masonry* con búsqueda (nombre, código, categoría, color…) y filtro por categoría; carga 40 prendas por tanda.
 - Hasta 4 fotos por prenda (JPG, PNG o WebP de hasta 8 MB), con portada elegible y miniaturas locales de 640 px como máximo.
+- **Fotos reducidas al guardar:** se guardan a 2048 px por lado como máximo, en JPEG al 85 % (las transparencias, sobre blanco). Una foto de móvil de 12 MP pasa de ~3 MB a ~0,3 MB, así que 1.000 prendas ocupan unos 0,7 GB en lugar de unos 4,6 GB. Las fotos que ya miden 2048 px o menos y pesan menos de 1 MB se guardan tal cual. El análisis se hace antes, con la foto original. Las fotos guardadas antes de este cambio no se reducen.
 - **Código único por prenda** según su tipo, como `SDC-002` (sudadera con capucha nº 2) o `VAQ-001`, para distinguir prendas parecidas. No cambia al editar la prenda y no se reutiliza al borrarla.
 - Detalle de cada prenda con sus fotos, la foto de la etiqueta, los atributos y la procedencia del análisis; edición y borrado.
 
@@ -34,20 +35,40 @@ El **estilo** es el nivel de vestir en cuatro niveles (Deportivo, Diario, Arregl
 ### Maleta
 - Plan de hasta 14 días para una ciudad y una fecha: un outfit por día según la previsión y una lista de equipaje única y editable. Los planes aún no se guardan.
 
-### Datos para entrenar el modelo
-- El botón **Exportar datos de entrenamiento** genera en el navegador un ZIP con las fotos y sus etiquetas normalizadas, sin nombre, marca, talla, notas ni foto de la etiqueta.
+### Copia de seguridad y datos
+El menú **Datos** del armario reúne:
+- **Exportar copia del armario:** un ZIP con todas las prendas y sus fotos (incluida la de la etiqueta), los outfits guardados, las preferencias y las valoraciones. Sirve como copia de seguridad y para pasar el armario a otro navegador o dispositivo. Contiene tus fotos: guárdalo en un sitio seguro.
+- **Importar copia:** lee el ZIP y, si ya tienes prendas, deja elegir entre **combinar** (añade lo que falta y, si una prenda está en los dos sitios, se queda la versión editada más recientemente) o **reemplazar** (el armario queda exactamente como la copia, con confirmación). Si un código ya lo usa otra prenda, la importada recibe uno nuevo. Una copia de una versión más reciente de la app se rechaza sin tocar nada.
+- **Google Drive** (si la instalación tiene ID de cliente, ver más abajo): **Guardar en Google Drive**, **Restaurar desde Google Drive** (el mismo panel de combinar o reemplazar) y **Guardar automáticamente**, que sube la copia unos 30 s después del último cambio mientras la sesión de Google siga activa (una hora); cuando caduca, avisa y basta un toque para reconectar.
+- **Exportar datos de entrenamiento:** un ZIP con las fotos y sus etiquetas normalizadas, sin nombre, marca, talla, notas ni foto de la etiqueta.
+
+#### Copia en Google Drive
+- La copia es el mismo ZIP, guardado como `vesta-armario.zip` en la **carpeta oculta de la app** de tu Drive (permiso `drive.appdata`): VESTA no puede ver el resto de tu Drive y el archivo no aparece entre tus archivos; lo ves (y puedes borrarlo) en Drive → Configuración → Administrar aplicaciones. Drive conserva versiones anteriores durante un tiempo.
+- **Varios dispositivos:** si la copia de Drive se ha guardado desde otro dispositivo después de la última vez que este la vio, VESTA no la sobrescribe: ofrece **Restaurar y combinar** o, confirmándolo, **Sobrescribir Drive**.
+- **Inicio de sesión sin scripts de Google en la app:** una ventana va a la página de Google y vuelve a `/oauth/google.html`, que entrega el token a la app y se cierra. El token solo vive en memoria, dura una hora y no se guarda; en el navegador solo se recuerda si el guardado automático está activo y cuándo se guardó.
+
+**Activarlo** (una vez, con tu cuenta de Google):
+1. En [Google Cloud Console](https://console.cloud.google.com/), crea un proyecto y habilita **Google Drive API**.
+2. En **Google Auth Platform → Público** (pantalla de consentimiento), tipo **Externo**, y añade tu cuenta en **Usuarios de prueba**. En **Acceso a datos**, añade el permiso `.../auth/drive.appdata`.
+3. En **Clientes → Crear cliente**, tipo **Aplicación web**:
+   - **Orígenes de JavaScript autorizados:** `http://localhost:5173` y `http://localhost:4173`.
+   - **URI de redireccionamiento autorizados:** `http://localhost:5173/oauth/google.html` y `http://localhost:4173/oauth/google.html`.
+   - Cuando la app tenga dirección pública, añade también su origen y su `/oauth/google.html`.
+4. Copia `.env.example` a `.env.local`, pon el ID de cliente en `VITE_GOOGLE_CLIENT_ID` y reinicia `npm run dev`. El ID de cliente no es secreto; `.env.local` está en `.gitignore`.
+
+Formato de la copia (`vesta-wardrobe-backup`, versión 1): `backup.json` con todos los registros, donde cada foto se sustituye por la ruta de su archivo en `photos/<id de prenda>/`, más esos archivos. Así podrá sincronizarse archivo a archivo más adelante.
 
 ## Privacidad
 
 - Prendas, fotos, outfits y preferencias se guardan solo en IndexedDB, en tu navegador. No hay backend, inicio de sesión ni analítica.
 - Los modelos (clasificador y lector de texto) se sirven desde el propio origen y se ejecutan en el dispositivo con WebAssembly: **las fotos y las predicciones no salen del navegador**.
-- La única conexión externa es Open-Meteo, cuando consultas el tiempo: recibe el nombre de la ciudad y sus coordenadas, nunca el inventario ni las fotos.
-- La política CSP solo permite conexiones al propio origen y a Open-Meteo.
+- Conexiones externas, solo cuando las usas: **Open-Meteo** al consultar el tiempo (recibe la ciudad y sus coordenadas, nunca el inventario ni las fotos) y **Google Drive** si guardas o restauras allí la copia (recibe la copia completa, fotos incluidas, en tu propia cuenta).
+- La política CSP solo permite conexiones al propio origen, a Open-Meteo y a la API de Google (`www.googleapis.com`). La app no carga scripts de Google: el inicio de sesión ocurre en una ventana aparte.
 - La PWA precachea la interfaz, pero no los modelos ni los datos personales. Los modelos se guardan en Cache Storage tras la primera descarga, para funcionar sin conexión.
 
 Esto describe el diseño del código; no es una auditoría de tráfico.
 
-**Pérdida de datos:** limpiar los datos del sitio, usar otro navegador o perfil, o la purga automática de algunos navegadores (Safari) borra o separa el armario. IndexedDB no cifra los datos. Todavía no hay copia de seguridad ni exportación completa del armario (está en la hoja de ruta).
+**Pérdida de datos:** limpiar los datos del sitio, usar otro navegador o perfil, o la purga automática de algunos navegadores (Safari) borra o separa el armario. Haz copias periódicas con **Datos → Exportar copia del armario**. IndexedDB no cifra los datos, y la copia tampoco va cifrada.
 
 ## Puesta en marcha
 
@@ -70,7 +91,8 @@ React 19, TypeScript y Vite; Dexie sobre IndexedDB; PWA con `vite-plugin-pwa`; i
 | `src/app/` | Pantallas, navegación y estado |
 | `src/components/` | Formulario y detalle de prenda, galería, generador de outfits, maleta |
 | `src/ai/` | Clasificador ONNX, lector de texto (OCR), marcas, talla y composición, reglas de uso, color |
-| `src/db/` | Base de datos Dexie, repositorio de prendas, códigos y miniaturas |
+| `src/db/` | Base de datos Dexie, repositorio de prendas, códigos, copia de seguridad y miniaturas |
+| `src/cloud/` | Inicio de sesión con Google, API de Drive y guardado automático |
 | `src/outfits/` | Generación y puntuación de outfits |
 | `src/weather/` | Cliente de Open-Meteo |
 | `src/ml/` | Taxonomía compartida con el entrenamiento y exportación de datos |
@@ -120,11 +142,12 @@ Las migraciones conservan los datos: v2 añade dimensiones a prendas antiguas; v
 
 ## Hoja de ruta
 
-- [ ] Exportar e importar el armario completo (JSON + imágenes), como copia de seguridad y para cambiar de dispositivo.
+- [x] Exportar e importar el armario completo (JSON + imágenes), como copia de seguridad y para cambiar de dispositivo.
 - [ ] Segmentación: añadir prendas desde una foto de cuerpo entero y guardar también el look; quitar el fondo de las fotos (con modelos de licencia comercial).
 - [ ] «Me lo pongo hoy» con calendario, y estadísticas (coste por uso, prendas olvidadas, colores, marcas).
 - [ ] Separar metadatos e imágenes en IndexedDB y cargar miniaturas bajo demanda.
-- [ ] Copia de seguridad opcional en el Google Drive del propio usuario.
+- [x] Copia de seguridad opcional en el Google Drive del propio usuario.
+- [ ] Copia en Drive por archivos (solo las fotos que cambian) en lugar de un ZIP completo, para armarios grandes.
 - [ ] Capa opcional de lenguaje natural para explicar y ordenar outfits, enviando solo texto.
 - [ ] Guardar los planes de viaje.
 - [ ] Tendencias, con una fuente fiable y fechada.
