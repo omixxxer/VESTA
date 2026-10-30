@@ -148,6 +148,7 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
       setCategory(suggestion.category)
       setSubcategory(suggestion.subcategory)
       setColors(suggestion.colors.join(', '))
+      if (suggestion.pattern) setPattern(suggestion.pattern.label)
     } catch (error) {
       console.error('No se pudo analizar la imagen de la prenda:', error)
       if (requestId === analysisRequestId.current) {
@@ -187,7 +188,8 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
         ? {
             category: analysisSuggestion.category,
             subcategory: analysisSuggestion.subcategory,
-            colors: analysisSuggestion.colors
+            colors: analysisSuggestion.colors,
+            pattern: analysisSuggestion.pattern?.label
           }
         : !imageChanged ? garment?.analysis?.suggestions : undefined
       const correctedAttributes: string[] = []
@@ -197,6 +199,7 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
         const savedColors = colors.split(',').map((value) => value.trim().toLocaleLowerCase('es')).filter(Boolean)
         const suggestedColors = previousSuggestions.colors.map((value) => value.toLocaleLowerCase('es'))
         if (savedColors.join('|') !== suggestedColors.join('|')) correctedAttributes.push('colors')
+        if (previousSuggestions.pattern && pattern.trim() !== previousSuggestions.pattern) correctedAttributes.push('pattern')
       }
       const analysis: GarmentAnalysis | undefined = analysisSuggestion
         ? {
@@ -207,12 +210,16 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
               category: analysisSuggestion.category,
               subcategory: analysisSuggestion.subcategory,
               colors: analysisSuggestion.colors,
+              ...(analysisSuggestion.pattern ? { pattern: analysisSuggestion.pattern.label } : {}),
+              ...(analysisSuggestion.sleeve ? { sleeve: analysisSuggestion.sleeve.label } : {}),
+              ...(analysisSuggestion.fit ? { fit: analysisSuggestion.fit.label } : {}),
               alternatives: analysisSuggestion.alternatives
             },
             confidenceByAttribute: analysisSuggestion.confidenceByAttribute,
             sourcesByAttribute: {
-              category: 'wargon-vit',
-              subcategory: 'wargon-vit',
+              category: 'vesta-dinov2',
+              subcategory: 'vesta-dinov2',
+              ...(analysisSuggestion.pattern ? { pattern: 'vesta-dinov2' as const } : {}),
               ...(analysisSuggestion.colors.length > 0 ? { colors: 'local-pixels' as const } : {})
             },
             unknownAttributes: analysisSuggestion.unknownAttributes,
@@ -246,7 +253,7 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
         height: processedImage.height,
         confirmedAttributes: ['category', 'colors', 'seasons', 'styles', 'formality', ...(pattern.trim() ? ['pattern'] : [])],
         suggestedAttributes: analysisSuggestion
-          ? ['category', 'subcategory', 'colors']
+          ? ['category', 'subcategory', 'colors', ...(analysisSuggestion.pattern ? ['pattern'] : [])]
           : imageChanged ? [] : garment?.suggestedAttributes ?? [],
         analysis,
         createdAt: garment?.createdAt ?? new Date(timestamp).toISOString(),
@@ -292,10 +299,10 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
         <button className="button button-outline" type="button" onClick={() => void analyzeImage()} disabled={!photos.length || analyzing || saving}>
           {analyzing ? `Analizando ${photos.length} ${photos.length === 1 ? 'foto' : 'fotos'}…` : 'Analizar de nuevo en este dispositivo'}
         </button>
-        <p>Las fotos se guardan con la prenda y se analizan automáticamente en este dispositivo. El modelo solo clasifica el tipo de prenda; combina las puntuaciones de todas las fotos para sugerir categoría y subcategoría. El color se estima aparte por píxeles (puede captar el fondo). Marca, talla, temporadas, estampado, estilo y formalidad no se detectan y deben completarse manualmente. Descarga del modelo bajo demanda: {MODEL_DOWNLOAD_SIZE}. Las fotos no se envían.</p>
+        <p>Las fotos se guardan con la prenda y se analizan automáticamente en este dispositivo. El modelo de VESTA combina las puntuaciones de todas las fotos para sugerir categoría, subcategoría y estampado, y también estima la manga o el corte del pantalón. El color se estima aparte por píxeles (puede captar el fondo). Marca, talla, temporadas, estilo y formalidad no se detectan y deben completarse manualmente. Descarga del modelo bajo demanda: {MODEL_DOWNLOAD_SIZE}. Las fotos no se envían.</p>
         {analysisSuggestion && (
           <div className="analysis-results" role="status">
-            <p>Sugerencia principal: {analysisSuggestion.category} · {analysisSuggestion.subcategory} ({(analysisSuggestion.confidenceByAttribute.category ?? 0).toLocaleString('es', { style: 'percent', maximumFractionDigits: 1 })}, puntuación no calibrada). Revisa y confirma los campos.</p>
+            <p>Sugerencia principal: {analysisSuggestion.category}{analysisSuggestion.subcategory ? ` · ${analysisSuggestion.subcategory}` : ''} ({(analysisSuggestion.confidenceByAttribute.category ?? 0).toLocaleString('es', { style: 'percent', maximumFractionDigits: 1 })}, puntuación no calibrada). Revisa y confirma los campos.</p>
             {analysisSuggestion.alternatives.length > 0 && (
               <div className="analysis-alternatives">
                 <span>Otras clases candidatas del modelo:</span>
@@ -310,12 +317,19 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
                     }}
                     disabled={saving}
                   >
-                    {candidate.category} · {candidate.subcategory} ({candidate.score.toLocaleString('es', { style: 'percent', maximumFractionDigits: 1 })})
+                    {candidate.category}{candidate.subcategory ? ` · ${candidate.subcategory}` : ''} ({candidate.score.toLocaleString('es', { style: 'percent', maximumFractionDigits: 1 })})
                   </button>
                 ))}
               </div>
             )}
-            <p>Campos rellenados o estimados: categoría, subcategoría y colores. Revisa el color; el resto de atributos requiere entrada manual.</p>
+            {(analysisSuggestion.sleeve || analysisSuggestion.fit) && (
+              <p>
+                {analysisSuggestion.sleeve && `Manga: ${analysisSuggestion.sleeve.label.toLocaleLowerCase('es')}. `}
+                {analysisSuggestion.fit && `Corte: ${analysisSuggestion.fit.label.toLocaleLowerCase('es')}. `}
+                Solo informativo; no se guarda como campo.
+              </p>
+            )}
+            <p>Campos rellenados o estimados: categoría, subcategoría, colores{analysisSuggestion.pattern ? ' y estampado' : ''}. Revisa el color; el resto de atributos requiere entrada manual.</p>
           </div>
         )}
         {analysisError && <p className="form-error" role="alert">{analysisError}</p>}

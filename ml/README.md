@@ -15,7 +15,7 @@ Objetivo: sustituir Wargon por un clasificador propio que use la taxonomía de l
 | 1. Taxonomía, preparación de datos y exportación desde la app | Hecha |
 | 2. Embeddings y entrenamiento de cabezas | Hecha |
 | 3. Evaluación por clase sobre fotos propias | Hecha (heads-v4; pocas fotos propias todavía) |
-| 4. ONNX, cuantización e integración en `clothingAnalyzer.ts` | Pendiente |
+| 4. ONNX, cuantización e integración en `clothingAnalyzer.ts` | Hecha (heads-v4, sustituye a Wargon) |
 
 ### Por hacer más adelante
 
@@ -94,6 +94,17 @@ python -m vesta_ml.train     # cabezas; guarda en models/<nombre>/
 - `python -m vesta_ml.evaluate <modelo> [--source vesta] [--split test] [--details]` evalúa un modelo guardado; por defecto, sobre todas tus fotos (un modelo entrenado antes de importarlas no las ha visto) y con `--details` muestra la predicción de cada foto.
 - `python -m vesta_ml.evaluate <modelo> --folder <ruta>` prueba el modelo con una carpeta de imágenes etiquetadas por el nombre de sus carpetas (`botas/`, `Calzado/zuecos/`; vale el nombre en español, en plural o un sinónimo). Sirve para imágenes **sin licencia para entrenar**, como las de Google Imágenes o webs de marcas: no se copian, no se cachean y nunca entran en el manifiesto. Muestra las métricas y la lista de fotos falladas.
 - `metrics.json` guarda, para val y test, exactitud, macro-F1, precisión/recall/F1 por clase, confusiones más frecuentes y el desglose por fuente. La fuente `clothing-dataset` (y en el futuro `vesta`) es la más parecida al uso real.
+
+## Exportación a la app
+
+```sh
+python -m vesta_ml.export heads-v4   # escribe public/models/vesta/
+```
+
+- [`export.py`](vesta_ml/export.py) exporta backbone y cabezas como un único ONNX (entrada: imagen ya preprocesada, 1×3×224×224; una salida de logits por cabeza entrenada), lo cuantiza a int8 (~26 MB) y escribe `vesta-model.json` con los valores de cada cabeza, el preprocesado y las reglas. Con `--check N` (300 por defecto) compara PyTorch, ONNX fp32 e int8 en imágenes de test.
+- Con heads-v4, int8 pierde como mucho ~1,5 puntos frente a fp32 (categoría 93,5 → 92,0 %, subcategoría 78,5 → 78,0 % en 400 imágenes de test). fp16 no pierde nada pero ocupa 46 MB y el runtime web no garantiza sus operaciones en WebAssembly.
+- La app ([`src/ai/clothingAnalyzer.ts`](../src/ai/clothingAnalyzer.ts)) usa onnxruntime-web (WebAssembly), replica el letterbox en un canvas, promedia las probabilidades de todas las fotos y aplica las mismas reglas que `targets.apply_rules`, leídas de `taxonomy.json`. Rechaza un modelo exportado con otra versión de taxonomía. El modelo se guarda en Cache Storage con su nombre y tamaño, así que una exportación nueva se descarga de nuevo y después funciona sin conexión.
+- Rellena categoría, subcategoría y estampado; la manga y el corte se muestran como información (la prenda no tiene esos campos). Formalidad, temporadas y color no se entrenan todavía: el color sigue saliendo del muestreo de píxeles.
 
 ## Propuestas y revisión de subcategorías
 
