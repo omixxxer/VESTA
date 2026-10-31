@@ -112,7 +112,7 @@ describe('wardrobe flow', () => {
 
     await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
     await user.upload(
-      screen.getByLabelText('Seleccionar fotografía de la prenda'),
+      await screen.findByLabelText('Seleccionar fotografía de la prenda'),
       new File(['image-bytes'], 'sportswear.png', { type: 'image/png' })
     )
 
@@ -150,7 +150,7 @@ describe('wardrobe flow', () => {
     render(<App />)
 
     await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
-    await user.type(screen.getByPlaceholderText('p. ej. Camiseta azul · Marca'), 'Camisa favorita')
+    await user.type(await screen.findByPlaceholderText('p. ej. Camiseta azul · Marca'), 'Camisa favorita')
     const upload = screen.getByLabelText('Seleccionar fotografía de la prenda')
     const image = new File(['image-bytes'], 'camisa.png', { type: 'image/png' })
     await user.upload(upload, image)
@@ -165,7 +165,7 @@ describe('wardrobe flow', () => {
     })
 
     await user.click(screen.getByRole('button', { name: 'Camisa favorita' }))
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(await screen.findByRole('dialog')).toBeInTheDocument() // the detail panel loads on demand
     expect(screen.getByText('Categoría')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Editar' }))
@@ -207,7 +207,7 @@ describe('wardrobe flow', () => {
     render(<App />)
 
     await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
-    const upload = screen.getByLabelText('Seleccionar fotografía de la prenda')
+    const upload = await screen.findByLabelText('Seleccionar fotografía de la prenda')
     const photos = [
       new File(['front'], 'camisa-frente.png', { type: 'image/png' }),
       new File(['back'], 'camisa-espalda.png', { type: 'image/png' })
@@ -233,7 +233,7 @@ describe('wardrobe flow', () => {
       { category: 'Parte superior', subcategory: 'Camisa', score: 0.24 }
     ])
     await user.click(screen.getByRole('button', { name: 'Camisa blanca y azul · Zara' }))
-    expect(screen.getByRole('button', { name: 'Ver foto 2' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Ver foto 2' })).toBeInTheDocument()
     expect(vi.mocked(analyzeGarmentImage)).toHaveBeenCalledWith(expect.arrayContaining([
       expect.any(Blob),
       expect.any(Blob)
@@ -262,7 +262,7 @@ describe('wardrobe flow', () => {
     render(<App />)
 
     await user.click(await screen.findByRole('button', { name: /añadir prenda/i }))
-    await user.upload(screen.getByLabelText('Seleccionar fotografía de la prenda'), new File(['shoe'], 'zapatilla.png', { type: 'image/png' }))
+    await user.upload(await screen.findByLabelText('Seleccionar fotografía de la prenda'), new File(['shoe'], 'zapatilla.png', { type: 'image/png' }))
     const label = new File(['label'], 'etiqueta.png', { type: 'image/png' })
     await user.upload(screen.getByLabelText('Seleccionar foto de la etiqueta'), label)
 

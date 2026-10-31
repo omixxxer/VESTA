@@ -1,8 +1,7 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import {
   analyzeGarmentImage,
   labelSize,
-  MODEL_DOWNLOAD_SIZE,
   readGarmentLabel,
   type ClothingAnalysisSuggestion,
   type LabelReading
@@ -15,12 +14,16 @@ import {
   garmentCategories,
   type DressLevel,
   type Garment,
-  type GarmentAnalysis,
   type GarmentCategory,
   type GarmentRole,
   type Season
 } from '../types/domain'
-import GarmentPhoto from './GarmentPhoto'
+import AnalysisCard from './garmentForm/AnalysisCard'
+import { analysisRecord } from './garmentForm/analysisRecord'
+import { ChipsField, FieldHeading, FormSection, SuggestedBadge } from './garmentForm/fields'
+import { createSuggestedGarmentName } from './garmentForm/garmentName'
+import LabelPhotoSlot, { type LabelFinding } from './garmentForm/LabelPhotoSlot'
+import PhotoCollection from './garmentForm/PhotoCollection'
 
 const seasons: Season[] = ['Primavera', 'Verano', 'Otoño', 'Invierno']
 const dressLevelHints: Record<DressLevel, string> = {
@@ -31,29 +34,6 @@ const dressLevelHints: Record<DressLevel, string> = {
 }
 const maxPhotos = 4
 const maxPhotoSize = 8 * 1024 * 1024
-const feminineSubcategories = new Set([
-  'bata',
-  'blusa',
-  'camisa',
-  'camiseta',
-  'camiseta de tirantes',
-  'chaqueta',
-  'chaqueta de invierno',
-  'falda',
-  'media',
-  'medias',
-  'prenda deportiva',
-  'prenda de abrigo',
-  'sudadera con capucha'
-])
-const feminineColors: Record<string, string> = {
-  blanco: 'blanca',
-  negro: 'negra',
-  rojo: 'roja',
-  morado: 'morada',
-  'gris claro': 'gris clara',
-  'gris oscuro': 'gris oscura'
-}
 const colorOptions = taxonomy.attributes.colors.values.map((value) => value.label)
 const patternOptions = taxonomy.attributes.pattern.values.map((value) => value.label)
 // How dressed up a garment is goes in «Estilo» (dress levels); these are aesthetics.
@@ -65,24 +45,6 @@ type SuggestedField = 'category' | 'subcategory' | 'colors' | 'pattern' | 'brand
 type UsageField = 'seasons' | 'dressLevels' | 'styles'
 const usageFields: UsageField[] = ['seasons', 'dressLevels', 'styles']
 
-function createSuggestedGarmentName(subcategory: string, colors: string[], brand: string): string {
-  const colorNames = colors.map((color) => color.trim()).filter(Boolean).slice(0, 2)
-  const isFeminine = feminineSubcategories.has(subcategory.trim().toLocaleLowerCase('es'))
-  const colorText = colorNames.map((color) => {
-    const normalized = color.toLocaleLowerCase('es')
-    const genderedColor = isFeminine
-      ? feminineColors[normalized] ?? normalized
-      : normalized
-    return genderedColor
-  }).join(' y ')
-  const name = [subcategory.trim(), colorText].filter(Boolean).join(' ')
-  return [name, brand.trim() ? `· ${brand.trim()}` : ''].filter(Boolean).join(' ').slice(0, 80).trimEnd()
-}
-
-function percent(value: number): string {
-  return value.toLocaleString('es', { style: 'percent', maximumFractionDigits: 0 })
-}
-
 const roles: Record<GarmentCategory, GarmentRole> = {
   'Parte superior': 'Top',
   'Parte inferior': 'Bottom',
@@ -90,103 +52,6 @@ const roles: Record<GarmentCategory, GarmentRole> = {
   Abrigo: 'Capa',
   Calzado: 'Calzado',
   Accesorio: 'Accesorio'
-}
-
-function SuggestedBadge() {
-  return <span className="suggested-badge" title="Rellenado por el análisis; revísalo">Sugerido</span>
-}
-
-function FieldHeading({ htmlFor, label, hint, suggested }: { htmlFor?: string; label: string; hint?: string; suggested?: boolean }) {
-  return (
-    <div className="field-heading">
-      {htmlFor ? <label htmlFor={htmlFor}>{label}</label> : <span>{label}</span>}
-      {hint && <small>{hint}</small>}
-      {suggested && <SuggestedBadge />}
-    </div>
-  )
-}
-
-interface ChipsFieldProps {
-  label: string
-  values: string[]
-  onChange: (values: string[]) => void
-  options: string[]
-  placeholder: string
-  suggested?: boolean
-}
-
-/** A list of short values edited as chips; Enter, comma or leaving the field adds what was typed. */
-function ChipsField({ label, values, onChange, options, placeholder, suggested }: ChipsFieldProps) {
-  const id = useId()
-  const [draft, setDraft] = useState('')
-
-  function add(text: string) {
-    const additions = text.split(',').map((value) => value.trim()).filter(Boolean)
-    const known = new Set(values.map((value) => value.toLocaleLowerCase('es')))
-    const fresh = additions.filter((value) => {
-      const key = value.toLocaleLowerCase('es')
-      if (known.has(key)) return false
-      known.add(key)
-      return true
-    })
-    if (fresh.length) onChange([...values, ...fresh])
-  }
-
-  function keyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault()
-      add(draft)
-      setDraft('')
-    } else if (event.key === 'Backspace' && !draft && values.length) {
-      onChange(values.slice(0, -1))
-    }
-  }
-
-  return (
-    <div className="form-field full">
-      <FieldHeading htmlFor={id} label={label} suggested={suggested} />
-      <div className="chips-input">
-        {values.map((value) => (
-          <span className="chip" key={value}>
-            {value}
-            <button type="button" onClick={() => onChange(values.filter((item) => item !== value))} aria-label={`Quitar ${value}`}>×</button>
-          </span>
-        ))}
-        <input
-          id={id}
-          list={`${id}-options`}
-          value={draft}
-          onChange={(event) => {
-            const text = event.target.value
-            if (text.includes(',')) {
-              add(text)
-              setDraft('')
-            } else {
-              setDraft(text)
-            }
-          }}
-          onKeyDown={keyDown}
-          onBlur={() => {
-            add(draft)
-            setDraft('')
-          }}
-          placeholder={values.length ? 'Añadir…' : placeholder}
-        />
-        <datalist id={`${id}-options`}>
-          {options.filter((option) => !values.includes(option)).map((option) => <option key={option} value={option} />)}
-        </datalist>
-      </div>
-    </div>
-  )
-}
-
-function FormSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <fieldset className="form-section">
-      <legend>{title}</legend>
-      <div className="form-grid">{children}</div>
-    </fieldset>
-  )
 }
 
 interface GarmentFormProps {
@@ -440,67 +305,14 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
             height: garment.height
           }
       const timestamp = Date.now()
-      const labelBrand = labelReading?.brand?.brand
-      const previousSuggestions = analysisSuggestion
-        ? {
-            category: analysisSuggestion.category,
-            subcategory: analysisSuggestion.subcategory,
-            colors: analysisSuggestion.colors,
-            pattern: analysisSuggestion.pattern?.label,
-            brand: labelBrand ?? analysisSuggestion.brand?.brand,
-            size: sizeFromLabel?.value,
-            composition: labelReading?.composition?.value
-          }
-        : !imageChanged ? garment?.analysis?.suggestions : undefined
-      const correctedAttributes: string[] = []
-      if (previousSuggestions) {
-        if (category !== previousSuggestions.category) correctedAttributes.push('category')
-        if (subcategory.trim() !== previousSuggestions.subcategory) correctedAttributes.push('subcategory')
-        const savedColors = colors.map((value) => value.toLocaleLowerCase('es'))
-        const suggestedColors = previousSuggestions.colors.map((value) => value.toLocaleLowerCase('es'))
-        if (savedColors.join('|') !== suggestedColors.join('|')) correctedAttributes.push('colors')
-        if (previousSuggestions.pattern && pattern.trim() !== previousSuggestions.pattern) correctedAttributes.push('pattern')
-        if (previousSuggestions.brand && brand.trim() !== previousSuggestions.brand) correctedAttributes.push('brand')
-        if (previousSuggestions.size && size.trim() !== previousSuggestions.size) correctedAttributes.push('size')
-        if (previousSuggestions.composition && composition.trim() !== previousSuggestions.composition) correctedAttributes.push('composition')
-      }
-      const analysis: GarmentAnalysis | undefined = analysisSuggestion
-        ? {
-            modelId: analysisSuggestion.modelId,
-            modelVersion: analysisSuggestion.modelVersion,
-            ...(analysisSuggestion.calibrated ? { calibrated: true } : {}),
-            analyzedAt: analysisSuggestion.analyzedAt,
-            suggestions: {
-              category: analysisSuggestion.category,
-              subcategory: analysisSuggestion.subcategory,
-              colors: analysisSuggestion.colors,
-              ...(analysisSuggestion.pattern ? { pattern: analysisSuggestion.pattern.label } : {}),
-              ...(analysisSuggestion.sleeve ? { sleeve: analysisSuggestion.sleeve.label } : {}),
-              ...(analysisSuggestion.fit ? { fit: analysisSuggestion.fit.label } : {}),
-              ...(labelBrand ?? analysisSuggestion.brand ? { brand: labelBrand ?? analysisSuggestion.brand!.brand } : {}),
-              ...(sizeFromLabel ? { size: sizeFromLabel.value } : {}),
-              ...(labelReading?.composition ? { composition: labelReading.composition.value } : {}),
-              alternatives: analysisSuggestion.alternatives
-            },
-            confidenceByAttribute: analysisSuggestion.confidenceByAttribute,
-            sourcesByAttribute: {
-              category: 'vesta-dinov2',
-              subcategory: 'vesta-dinov2',
-              ...(analysisSuggestion.pattern ? { pattern: 'vesta-dinov2' as const } : {}),
-              ...(labelBrand ?? analysisSuggestion.brand ? { brand: 'paddle-ocr' as const } : {}),
-              ...(sizeFromLabel ? { size: 'paddle-ocr' as const } : {}),
-              ...(labelReading?.composition ? { composition: 'paddle-ocr' as const } : {}),
-              ...(analysisSuggestion.colors.length > 0 ? { colors: 'local-pixels' as const } : {})
-            },
-            unknownAttributes: analysisSuggestion.unknownAttributes,
-            correctedAttributes
-          }
-        : !imageChanged && garment?.analysis
-          ? {
-              ...garment.analysis,
-              correctedAttributes
-            }
-          : undefined
+      const analysis = analysisRecord({
+        suggestion: analysisSuggestion,
+        labelReading,
+        labelSize: sizeFromLabel,
+        imageChanged,
+        garment,
+        values: { category, subcategory, colors, pattern, brand, size, composition }
+      })
       await onSave({
         id: garment?.id ?? crypto.randomUUID(),
         ...(garment?.code ? { code: garment.code } : {}),
@@ -545,144 +357,47 @@ export default function GarmentForm({ garment, onSave, onCancel, submitLabel }: 
   // A pattern typed in an earlier version of the form stays selectable.
   const patterns = pattern && !patternOptions.includes(pattern) ? [...patternOptions, pattern] : patternOptions
   const brandRead = labelReading?.brand ?? analysisSuggestion?.brand
-  const readFromLabel = ([
+  const readFromLabel: LabelFinding[] = ([
     ['Marca', brandRead?.brand, brandRead?.text],
     ['Talla', sizeFromLabel?.value, sizeFromLabel?.text],
     ['Composición', labelReading?.composition?.value, labelReading?.composition?.text]
   ] as const).filter(([, value]) => value)
-  const shape = analysisSuggestion && [analysisSuggestion.sleeve?.label, analysisSuggestion.fit && `Corte ${analysisSuggestion.fit.label.toLocaleLowerCase('es')}`].filter(Boolean)
 
   return (
     <form className="garment-form" onSubmit={(event) => void submit(event)}>
       <div className="garment-form-layout">
         <aside className="garment-form-media">
-          <div className="photo-collection">
-            {photos.map((photo, index) => (
-              <div className="photo-card" key={`${index}-${photo.size}-${photo.type}`}>
-                <GarmentPhoto image={photo} alt={`Foto ${index + 1} de la prenda`} />
-                <div className="photo-card-actions">
-                  {index === 0
-                    ? <span>Foto principal</span>
-                    : <button type="button" onClick={() => updatePhotos([photo, ...photos.filter((_, photoIndex) => photoIndex !== index)])} disabled={saving}>Hacer principal</button>}
-                  <button type="button" onClick={() => updatePhotos(photos.filter((_, photoIndex) => photoIndex !== index))} disabled={saving} aria-label={`Quitar foto ${index + 1}`}>Quitar</button>
-                </div>
-              </div>
-            ))}
-            {photos.length < maxPhotos && <label className="photo-upload">
-              <span className="upload-placeholder"><span aria-hidden="true">＋</span><strong>{photos.length ? 'Añadir otra foto' : 'Añade fotos de la prenda'}</strong><small>Hasta {maxPhotos} fotos · JPG, PNG o WebP · 8 MB cada una</small></span>
-              <input
-                type="file"
-                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                capture="environment"
-                multiple
-                onChange={(event) => {
-                  selectImages(event.currentTarget.files)
-                  event.currentTarget.value = ''
-                }}
-                aria-label="Seleccionar fotografía de la prenda"
-              />
-            </label>}
-          </div>
+          <PhotoCollection photos={photos} max={maxPhotos} disabled={saving} onAdd={selectImages} onChange={updatePhotos} />
 
-          <section className="label-slot" aria-labelledby={`${fieldId}-label-title`}>
-            <div className="label-slot-header">
-              <p className="analysis-label" id={`${fieldId}-label-title`}>Foto de la etiqueta</p>
-              <small>Opcional · solo se lee el texto</small>
-            </div>
-            {labelPhoto ? (
-              <div className="label-slot-body">
-                <GarmentPhoto image={labelPhoto} alt="Etiqueta de la prenda" />
-                <div className="label-slot-reading" role="status">
-                  {readingLabel && <p className="analysis-progress">Leyendo la etiqueta…</p>}
-                  {!readingLabel && readFromLabel.length > 0 && (
-                    <dl className="analysis-read">
-                      {readFromLabel.map(([label, value, text]) => (
-                        <div key={label}><dt>{label}</dt><dd>{value}{text && text.toLocaleLowerCase('es') !== value?.toLocaleLowerCase('es') && <> <q>{text}</q></>}</dd></div>
-                      ))}
-                    </dl>
-                  )}
-                  {!readingLabel && labelReading && !readFromLabel.length && !labelError && (
-                    <p className="analysis-progress">No se ha reconocido marca, talla ni composición.</p>
-                  )}
-                  {labelError && <p className="form-error" role="alert">{labelError}</p>}
-                  <div className="label-slot-actions">
-                    {!labelReading && !readingLabel && <button type="button" onClick={() => void readLabel(labelPhoto)} disabled={saving}>Leer etiqueta</button>}
-                    <button type="button" onClick={removeLabelPhoto} disabled={saving} aria-label="Quitar foto de la etiqueta">Quitar</button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <label className="label-upload">
-                <span aria-hidden="true">＋</span>
-                <span>Añadir foto de la etiqueta <small>para leer marca, talla y composición; no cuenta para el tipo ni el color</small></span>
-                <input
-                  type="file"
-                  accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                  capture="environment"
-                  onChange={(event) => {
-                    selectLabelPhoto(event.currentTarget.files?.[0])
-                    event.currentTarget.value = ''
-                  }}
-                  aria-label="Seleccionar foto de la etiqueta"
-                />
-              </label>
-            )}
-            {!labelPhoto && labelError && <p className="form-error" role="alert">{labelError}</p>}
-          </section>
+          <LabelPhotoSlot
+            id={fieldId}
+            photo={labelPhoto}
+            reading={readingLabel}
+            read={Boolean(labelReading)}
+            findings={readFromLabel}
+            error={labelError}
+            disabled={saving}
+            onSelect={selectLabelPhoto}
+            onRead={(photo) => void readLabel(photo)}
+            onRemove={removeLabelPhoto}
+          />
 
-          <div className="analysis-card" role="status">
-            {analyzing && <p className="analysis-progress">Analizando {photos.length} {photos.length === 1 ? 'foto' : 'fotos'}…</p>}
-            {!analyzing && analysisSuggestion && (
-              <>
-                <p className="analysis-label">Sugerencia del análisis</p>
-                <p className="analysis-main">{analysisSuggestion.subcategory || analysisSuggestion.category}</p>
-                <p className="analysis-meta">
-                  {analysisSuggestion.subcategory ? `${analysisSuggestion.category} · ` : ''}
-                  {percent(analysisSuggestion.confidenceByAttribute.category ?? 0)} de confianza{analysisSuggestion.calibrated ? '' : ' (no calibrada)'}
-                </p>
-                {analysisSuggestion.alternatives.length > 0 && (
-                  <div className="analysis-alternatives">
-                    <span>¿No es esto?</span>
-                    {analysisSuggestion.alternatives.map((candidate) => (
-                      <button
-                        type="button"
-                        key={`${candidate.category}-${candidate.subcategory}`}
-                        aria-label={`${candidate.category}${candidate.subcategory ? ` · ${candidate.subcategory}` : ''}`}
-                        onClick={() => {
-                          setCategory(candidate.category)
-                          setSubcategory(candidate.subcategory)
-                          setName(candidate.subcategory)
-                          edited('category')
-                          edited('subcategory')
-                        }}
-                        disabled={saving}
-                      >
-                        {candidate.subcategory || candidate.category} <small>{percent(candidate.score)}</small>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {shape && shape.length > 0 && (
-                  <p className="analysis-info">{shape.join(' · ')} <small>(informativo, no se guarda)</small></p>
-                )}
-                {analysisSuggestion.brand && !labelReading?.brand && (
-                  <p className="analysis-info">Marca leída en la prenda: {analysisSuggestion.brand.brand}</p>
-                )}
-              </>
-            )}
-            {!analyzing && !analysisSuggestion && !analysisError && (
-              <p className="analysis-progress">{photos.length ? 'Pulsa «Analizar de nuevo» para obtener sugerencias.' : 'Añade una foto y sugeriremos tipo, color y estampado.'}</p>
-            )}
-            {analysisError && <p className="form-error" role="alert">{analysisError}</p>}
-            <button className="button button-outline analysis-again" type="button" onClick={() => void analyzeImage()} disabled={!photos.length || analyzing || saving}>
-              {analyzing ? 'Analizando…' : 'Analizar de nuevo'}
-            </button>
-          </div>
-
-          <details className="analysis-details">
-            <summary>¿Cómo se analiza?</summary>
-            <p>Las fotos se analizan en este dispositivo y no se envían. El modelo de VESTA combina todas las fotos para sugerir categoría, subcategoría y estampado, y estima la manga o el corte del pantalón. El color se calcula por píxeles y puede captar el fondo. La marca se lee si aparece escrita (etiqueta, lengüeta…); los logos sin letras no se reconocen. Talla y composición salen de la foto de la etiqueta, que va en su propio campo y solo se usa para leer texto: no cuenta para el tipo ni el color. Temporadas, estilo y formalidad se completan a mano. Las sugerencias nunca sustituyen lo que hayas escrito en marca, talla o composición. Descarga del modelo la primera vez: {MODEL_DOWNLOAD_SIZE}.</p>
-          </details>
+          <AnalysisCard
+            analyzing={analyzing}
+            photoCount={photos.length}
+            suggestion={analysisSuggestion}
+            labelHasBrand={Boolean(labelReading?.brand)}
+            error={analysisError}
+            disabled={saving}
+            onAlternative={(candidate) => {
+              setCategory(candidate.category)
+              setSubcategory(candidate.subcategory)
+              setName(candidate.subcategory)
+              edited('category')
+              edited('subcategory')
+            }}
+            onAnalyze={() => void analyzeImage()}
+          />
         </aside>
 
         <div className="garment-form-fields">

@@ -47,7 +47,8 @@ describe('OutfitGenerator', () => {
     const rendered = render(<OutfitGenerator {...props} />)
 
     await user.click(screen.getByRole('button', { name: 'Generar outfits' }))
-    expect(await screen.findByRole('heading', { name: /Diario · \d+(?:\.\d+)?\/100/ })).toBeInTheDocument()
+    // The score (a rolling Counter) uses the Spanish decimal comma.
+    expect(await screen.findByRole('heading', { name: /Diario · \d+(?:,\d+)?\s?\/100/ })).toBeInTheDocument()
     expect((await screen.findAllByRole('img')).map((image) => image.getAttribute('alt'))).toEqual(['shirt', 'trousers'])
 
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
