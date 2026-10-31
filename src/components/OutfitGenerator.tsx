@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type TouchEvent } from 'react'
 import { database } from '../db/database'
 import { dressLevels, type DressLevel, type Garment, type Outfit, type UserPreferences } from '../types/domain'
 import GarmentPhoto from './GarmentPhoto'
+import { Counter, LatticeLoader, SpotlightCard } from './reactBits'
 import { getCityForecast } from '../weather/openMeteo'
 import {
   createOutfitFeedback,
@@ -18,6 +19,12 @@ interface OutfitGeneratorProps {
   onAvailabilityChange: (garment: Garment) => Promise<void>
 }
 
+// The outfit card's own surface and border, so the spotlight only adds its light.
+const spotlightSurface = {
+  '--spotlight-card-surface': 'rgba(245, 245, 239, .8)',
+  '--spotlight-card-border': 'rgba(48, 53, 47, .18)',
+  '--spotlight-card-shadow': 'none'
+}
 const occasions: OutfitTemplate[] = ['Diario', 'Arreglado', 'Formal', 'Deportivo', 'Frío y capas', 'Calor y pocas capas']
 const emptyPreferences: UserPreferences = {
   id: 'current',
@@ -329,13 +336,14 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
         <button className="button button-outline" type="button" onClick={() => { setResults([]); void generate() }} disabled={loading || garments.length === 0}>Regenerar</button>
       </div>
 
-      {loading && <div className="loading-state" role="status">Combinando prendas disponibles…</div>}
+      {loading && <div className="loading-state"><LatticeLoader label="Combinando prendas disponibles" pattern="sweep" grid={4} fontSize={13} showTimer={false} /></div>}
       {!loading && results.length > 0 && <div className="outfit-results outfit-swipe-list">
         {results.map((entry, index) => (
-          <article className="outfit-card" key={entry.outfit.id}
+          <SpotlightCard key={entry.outfit.id} theme="light" className="outfit-spotlight" style={spotlightSurface} spotlightColor="#9AA58E" intensity={0.6} spotlightSize={280} borderGlow={0.8} flare={false}>
+          <article className="outfit-card"
             onTouchStart={(event) => { touchStart.current = { x: event.touches[0]?.clientX ?? 0, y: event.touches[0]?.clientY ?? 0 } }}
             onTouchEnd={(event) => finishSwipe(event, entry)}>
-            <header><div><p className="eyebrow">RECOMENDACIÓN {index + 1}</p><h2>{occasion} · {entry.outfit.score}/100</h2></div></header>
+            <header><div><p className="eyebrow">RECOMENDACIÓN {index + 1}</p><h2>{occasion} · <Counter value={entry.outfit.score} locale="es" fontSize="1em" fade={0.15} />/100</h2></div></header>
             <div className="outfit-garments">
               {entry.candidate.garments.map((garment) => (
                 <figure key={garment.id}><GarmentPhoto image={garment.thumbnail ?? garment.image} alt={garmentLabel(garment)} /><figcaption>{garmentLabel(garment)}</figcaption></figure>
@@ -351,6 +359,7 @@ export default function OutfitGenerator({ garments, onAvailabilityChange }: Outf
             </div>
             <p className="swipe-hint">En móvil, desliza a la derecha para valorar positivamente o a la izquierda para descartar. También puedes usar estos botones.</p>
           </article>
+          </SpotlightCard>
         ))}
       </div>}
       </>}

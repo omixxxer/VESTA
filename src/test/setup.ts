@@ -28,4 +28,15 @@ Object.defineProperty(globalThis, 'ResizeObserver', {
   configurable: true
 })
 
+// jsdom has no IntersectionObserver (used by some React Bits components); nothing is ever on screen in tests.
+Object.defineProperty(globalThis, 'IntersectionObserver', {
+  value: class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() { return [] }
+  },
+  configurable: true
+})
+
 afterEach(cleanup)

@@ -84,12 +84,12 @@ npm run preview    # previsualizar la compilación
 
 ## Arquitectura
 
-React 19, TypeScript y Vite; Dexie sobre IndexedDB; PWA con `vite-plugin-pwa`; inferencia con `onnxruntime-web` (WebAssembly). La interfaz usa componentes de React Bits (Masonry, Pill Nav y el fondo Pattern Waves con OGL, que se detiene si el sistema prefiere movimiento reducido) e iconos de Hugeicons.
+React 19, TypeScript y Vite (pantallas, formulario, detalle de prenda y fondo animado cargados bajo demanda con `React.lazy`); Dexie sobre IndexedDB; PWA con `vite-plugin-pwa`; inferencia con `onnxruntime-web` (WebAssembly). La interfaz usa componentes de [React Bits](https://reactbits.dev) (MIT + Commons Clause) e iconos de Hugeicons: Masonry (galería), Pill Nav (navegación inferior), Pattern Waves (fondo, con OGL), Gradual Blur (desenfoque del contenido que pasa bajo la navegación), Lattice Loader (estados de carga, con cronómetro mientras se analizan fotos o se lee la etiqueta), Counter (número de prendas y puntuación de los outfits, con cifras que ruedan) y Spotlight Card (luz que sigue al puntero en las recomendaciones). Todos respetan la preferencia de movimiento reducido del sistema. Se usan a través de [`reactBits.ts`](src/components/reactBits.ts), que les da tipos con todas las propiedades opcionales.
 
 | Carpeta | Contenido |
 |---|---|
 | `src/app/` | Pantallas, navegación y estado |
-| `src/components/` | Formulario y detalle de prenda, galería, generador de outfits, maleta |
+| `src/components/` | Formulario y detalle de prenda, galería, generador de outfits, maleta; `garmentForm/` agrupa las piezas del formulario (fotos, etiqueta, análisis, campos, nombre sugerido y registro del análisis) |
 | `src/ai/` | Clasificador ONNX, lector de texto (OCR), marcas, talla y composición, reglas de uso, color |
 | `src/db/` | Base de datos Dexie, repositorio de prendas, códigos, copia de seguridad y miniaturas |
 | `src/cloud/` | Inicio de sesión con Google, API de Drive y guardado automático |
@@ -122,7 +122,7 @@ Las migraciones conservan los datos: v2 añade dimensiones a prendas antiguas; v
 - **Formato:** un único ONNX int8 de ~25,6 MB en `public/models/vesta/`, con `vesta-model.json` (salidas, preprocesado, reglas y temperaturas de calibración).
 - **Cómo combina las fotos:** promedia las probabilidades de todas las fotos, elige la categoría y busca la subcategoría solo dentro de ella; las alternativas se ordenan por P(categoría) × P(subcategoría | categoría). La app rechaza un modelo exportado con otra versión de taxonomía.
 - **Calidad** (heads-v4, test de 2.987 imágenes de las fuentes de entrenamiento): categoría 92,8 %, subcategoría 80,3 % (macro-F1 0,73), manga 88,1 %, estampado 85,3 %, corte 63,4 %. El detalle por clase está en [`ml/README.md`](ml/README.md).
-- **Velocidad** en el equipo de desarrollo: la primera foto tarda ~10 s (descarga y carga del modelo); las siguientes, 0,6–1 s. No se ha medido en móviles.
+- **Velocidad** en el equipo de desarrollo: la primera foto tarda ~10 s (descarga y carga del modelo); las siguientes, ~1 s con la lectura de texto incluida. La inferencia corre en un *worker* de ONNX Runtime (`env.wasm.proxy`), así que la interfaz no se congela: con 3 fotos, el hilo principal pasó de 3,2 s bloqueado (picos de 960 ms) a ninguna tarea larga. No se ha medido en móviles.
 
 ### Lector de texto (OCR)
 - **Modelos:** PaddleOCR PP-OCRv5 mobile (Apache-2.0), con un detector de 4,8 MB y un reconocedor de alfabeto latino de 8 MB, en `public/models/ocr/`. Tarda 1–2 s por foto, en paralelo con el clasificador.
@@ -151,7 +151,8 @@ Las migraciones conservan los datos: v2 añade dimensiones a prendas antiguas; v
 - [ ] Capa opcional de lenguaje natural para explicar y ordenar outfits, enviando solo texto.
 - [ ] Guardar los planes de viaje.
 - [ ] Tendencias, con una fuente fiable y fechada.
-- [ ] Dividir el bloque principal de JavaScript (533 kB, que supera el aviso de 500 kB de Vite).
+- [x] Dividir el bloque principal de JavaScript: las pantallas se cargan bajo demanda (433 kB al abrir, antes 582 kB).
+- [x] Inferencia fuera del hilo principal, para que analizar fotos no congele la interfaz.
 - [ ] Probar la usabilidad en móvil y escritorio, y validar el generador con armarios grandes e incompletos.
 
 ## Licencia

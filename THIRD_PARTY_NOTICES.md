@@ -35,6 +35,12 @@ Las cabezas se entrenaron solo con datos cuya licencia permite uso comercial. Lo
 | [Hugeicons](https://hugeicons.com) (`@hugeicons/core-free-icons`, `@hugeicons/react`) | MIT |
 | [Workbox](https://github.com/GoogleChrome/workbox) (vía `vite-plugin-pwa`) | MIT |
 
+### Componentes de React Bits
+
+`src/components/` incluye componentes de [React Bits](https://reactbits.dev) (Masonry, Pill Nav, Pattern Waves, Counter, Lattice Loader, Spotlight Card y Gradual Blur), copiados desde su registro y, en algún caso, adaptados (textos en español en Lattice Loader). Su licencia es **MIT + Commons Clause**: se pueden usar en una aplicación, también comercial, pero no vender, sublicenciar ni redistribuir los componentes por sí mismos. No están cubiertos por la licencia de VESTA.
+
+> MIT + Commons Clause License Condition v1.0 — Copyright (c) 2026 David Haz. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, and distribute the Software as part of an application, website, or product, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. Commons Clause Restriction: You may use this Software, including for any commercial purpose, so long as you do not sell, sublicense, or redistribute the components themselves—whether alone, in a bundle, or as a ported version. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. Texto completo: https://github.com/DavidHDev/react-bits/blob/main/LICENSE.md
+
 Las herramientas de desarrollo y pruebas (Vite, TypeScript, Vitest, Testing Library…) y las de entrenamiento en `ml/` (PyTorch, Transformers, ONNX, Pillow, NumPy) no se distribuyen con la app; cada una tiene su licencia.
 
 ## Servicios externos

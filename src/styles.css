@@ -393,6 +393,8 @@ h1, h2, p { margin-top: 0; }
 .outfit-notice { padding: 11px 13px; border-left: 3px solid var(--sage); background: var(--soft-surface); font-size: 11px; line-height: 1.5; }
 .outfit-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 28px; }
 .outfit-card { min-width: 0; padding: 17px; border: 1px solid var(--line); border-radius: 7px; background: rgba(245, 245, 239, .8); }
+.outfit-spotlight { min-width: 0; padding: 0; border-radius: 7px; }
+.outfit-spotlight > .outfit-card { border: 0; background: transparent; }
 .outfit-card header { display: flex; justify-content: space-between; gap: 10px; }
 .outfit-card .eyebrow { margin-bottom: 6px; }
 .outfit-card h2 { margin: 0; font-family: var(--serif); font-size: 19px; font-weight: 500; }

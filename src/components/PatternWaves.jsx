@@ -1,3 +1,4 @@
+// From React Bits (MIT + Commons Clause, see THIRD_PARTY_NOTICES.md).
 import React from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 import { Renderer, Program, Mesh, Triangle, RenderTarget, Texture } from 'ogl';

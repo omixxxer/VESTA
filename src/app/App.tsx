@@ -1,17 +1,25 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { garmentRepository } from '../db/garmentRepository'
-import GarmentDetailPanel from '../components/GarmentDetailPanel'
-import GarmentForm from '../components/GarmentForm'
 import Masonry from '../components/Masonry.jsx'
-import PatternWaves from '../components/PatternWaves.jsx'
 import PillNav from '../components/PillNav.jsx'
-import OutfitGenerator from '../components/OutfitGenerator'
-import TripPlanner from '../components/TripPlanner'
 import WardrobeData from '../components/WardrobeData'
 import { useDriveSync } from '../cloud/useDriveSync'
 import { garmentCategories, type Garment } from '../types/domain'
+import { Counter, GradualBlur, LatticeLoader } from '../components/reactBits'
 
 type Page = 'wardrobe' | 'add' | 'outfits' | 'packing'
+
+// Loaded when first needed, so the wardrobe opens without them: the form and the detail bring the analyser,
+// Outfits and Maleta their own screens, and the animated background its WebGL library.
+const GarmentForm = lazy(() => import('../components/GarmentForm'))
+const GarmentDetailPanel = lazy(() => import('../components/GarmentDetailPanel'))
+const OutfitGenerator = lazy(() => import('../components/OutfitGenerator'))
+const TripPlanner = lazy(() => import('../components/TripPlanner'))
+const PatternWaves = lazy(() => import('../components/PatternWaves.jsx'))
+
+function ScreenLoader() {
+  return <div className="loading-state"><LatticeLoader label="Cargando" pattern="ripple" fontSize={13} showTimer={false} /></div>
+}
 
 type GalleryItem = {
   id: string
@@ -163,6 +171,7 @@ function App() {
 
   return (
     <>
+      <Suspense fallback={null}>
       <PatternWaves
         className="app-background"
         preset="lines"
@@ -185,6 +194,7 @@ function App() {
         paused={reducedMotion}
         style={undefined}
       />
+      </Suspense>
       <div className="app-shell">
         <header className="app-header">
           <a className="wordmark" href="#armario" onClick={() => setPage('wardrobe')} aria-label="VESTA, ir al armario">
@@ -215,7 +225,7 @@ function App() {
               </WardrobeData>
 
               <div className="wardrobe-toolbar">
-                <span className="item-count">{garments.length} {garments.length === 1 ? 'PRENDA' : 'PRENDAS'}</span>
+                <span className="item-count"><Counter value={garments.length} locale="es" fontSize="1em" fade={0.15} intro={false} /> {garments.length === 1 ? 'PRENDA' : 'PRENDAS'}</span>
                 <div className="filters">
                   <label className="search-field">
                     <span aria-hidden="true">⌕</span>
@@ -231,7 +241,7 @@ function App() {
               </div>
 
               {loading ? (
-                <div className="loading-state" role="status">Abriendo tu armario…</div>
+                <div className="loading-state"><LatticeLoader label="Abriendo tu armario" pattern="ripple" fontSize={13} showTimer={false} /></div>
               ) : visibleGarments.length === 0 ? (
                 <section className="empty-state">
                   <div className="empty-mark" aria-hidden="true">✳</div>
@@ -278,20 +288,26 @@ function App() {
               <p className="eyebrow">UNA NUEVA HISTORIA</p>
               <h1 id="add-title">Añadir prenda<span>.</span></h1>
               <p className="page-intro">Las fotografías se procesan en este dispositivo y no se envían a ningún sitio.</p>
-              <GarmentForm
-                onSave={createGarment}
-                onCancel={() => setPage('wardrobe')}
-                submitLabel="Guardar prenda"
-              />
+              <Suspense fallback={<ScreenLoader />}>
+                <GarmentForm
+                  onSave={createGarment}
+                  onCancel={() => setPage('wardrobe')}
+                  submitLabel="Guardar prenda"
+                />
+              </Suspense>
             </section>
           )}
 
           {page === 'outfits' && (
-            <OutfitGenerator garments={garments} onAvailabilityChange={updateAvailability} />
+            <Suspense fallback={<ScreenLoader />}>
+              <OutfitGenerator garments={garments} onAvailabilityChange={updateAvailability} />
+            </Suspense>
           )}
-          {page === 'packing' && <TripPlanner garments={garments} />}
+          {page === 'packing' && <Suspense fallback={<ScreenLoader />}><TripPlanner garments={garments} /></Suspense>}
         </main>
 
+        {/* Content scrolling under the bottom navigation blurs softly instead of being cut; gone at the end of the page. */}
+        <GradualBlur target="page" position="bottom" height="6.5rem" strength={1.4} layers={6} autoHide zIndex={15} />
         <PillNav
           items={navigation}
           activeHref={pageHrefs[page]}
@@ -318,12 +334,14 @@ function App() {
       </div>
 
       {selectedGarment && (
-        <GarmentDetailPanel
-          garment={selectedGarment}
-          onClose={closeDetail}
-          onSave={updateGarment}
-          onDelete={removeGarment}
-        />
+        <Suspense fallback={null}>
+          <GarmentDetailPanel
+            garment={selectedGarment}
+            onClose={closeDetail}
+            onSave={updateGarment}
+            onDelete={removeGarment}
+          />
+        </Suspense>
       )}
     </>
   )

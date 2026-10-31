@@ -1,3 +1,4 @@
+// From React Bits (MIT + Commons Clause, see THIRD_PARTY_NOTICES.md).
 import React from 'react';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import './PillNav.css';
